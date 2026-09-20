@@ -1,0 +1,96 @@
+@startuml
+title SEQUENCE 01 - ĐĂNG NHẬP VÀ PHÂN QUYỀN
+autonumber
+hide footbox
+skinparam responseMessageBelowArrow true
+
+actor "Người dùng" as User
+boundary "Web/POS/App" as UI
+control "Auth API" as Auth
+control "RBAC Service" as RBAC
+database "User DB" as UserDB
+database "Session Store" as SessionDB
+control "Audit Service" as Audit
+collections "Identity signing-key volume\n(private + public PEM)" as KeyStore
+control "Organization Service" as Organization
+
+group Khởi động và công bố khóa xác minh
+  Auth -> KeyStore: Đọc cặp khóa RSA theo kid
+  alt Chưa có khóa trong môi trường local
+    Auth -> KeyStore: Sinh RSA-2048 và lưu bền vững
+  end
+  Organization -> Auth: GET /.well-known/jwks.json
+  Auth --> Organization: Public JWK (kid, kty, n, e)\nkhông chứa private key
+  Organization -> Organization: Cache public key theo TTL
+end
+
+User -> UI: Nhập tài khoản, mật khẩu
+UI -> Auth: POST /api/v1/auth/login(credentials, device)
+Auth -> UserDB: Tìm tài khoản theo định danh
+alt Không tìm thấy hoặc đang bị khóa
+  UserDB --> Auth: Không hợp lệ
+  Auth -> Audit: Ghi nhận đăng nhập thất bại
+  Auth --> UI: 401/423 + lý do phù hợp
+  UI --> User: Thông báo thất bại
+else Tài khoản hoạt động
+  UserDB --> Auth: user + passwordHash + trạng thái
+  Auth -> Auth: Kiểm tra mật khẩu
+  alt Sai mật khẩu
+    Auth -> UserDB: Tăng số lần đăng nhập sai
+    opt Vượt ngưỡng cho phép
+      Auth -> UserDB: Khóa tạm thời tài khoản
+    end
+    Auth -> Audit: Ghi nhận đăng nhập thất bại
+    Auth --> UI: 401 Sai thông tin
+  else Đúng mật khẩu
+    Auth -> RBAC: Lấy vai trò, quyền, phạm vi chi nhánh
+    RBAC -> UserDB: Đọc role-permission-branch scope
+    UserDB --> RBAC: Danh sách quyền hiệu lực
+    RBAC --> Auth: permissions + branchScopes
+    Auth -> SessionDB: Tạo refresh session
+    Auth -> Audit: Ghi nhận đăng nhập thành công
+    Auth --> UI: JWT access token + refresh token + quyền
+    UI --> User: Mở màn hình theo vai trò
+  end
+end
+
+group Làm mới access token
+  UI -> Auth: POST /api/v1/auth/token/refresh(refresh token)
+  Auth -> Auth: Parse token opaque và đối chiếu hash/thời hạn
+  Auth -> SessionDB: Kiểm tra refresh session chưa bị thu hồi
+  alt Refresh token và session hợp lệ
+    SessionDB --> Auth: Session hợp lệ
+    Auth -> SessionDB: Thu hồi token cũ và lưu refresh token mới
+    Auth -> Audit: Ghi nhận làm mới token thành công
+    Auth --> UI: JWT access token mới + refresh token mới
+  else Token hết hạn, không hợp lệ hoặc đã bị thu hồi
+    SessionDB --> Auth: Session không hợp lệ
+    Auth -> Audit: Ghi nhận làm mới token thất bại
+    Auth --> UI: 401 Unauthorized
+    UI --> User: Yêu cầu đăng nhập lại
+  end
+end
+
+group Đăng xuất
+  UI -> Auth: POST /api/v1/auth/logout(refresh token) + Bearer JWT
+  Auth -> SessionDB: Thu hồi refresh session/token còn hiệu lực
+  Auth -> Audit: Ghi nhận đăng xuất
+  Auth --> UI: 204 No Content
+end
+
+group Truy cập chức năng được bảo vệ
+  User -> UI: Thực hiện hành động tại chi nhánh
+  UI -> Organization: API request + Bearer JWT access token
+  Organization -> Organization: Chọn public key theo kid; kiểm tra\nRS256, chữ ký, iss, aud, exp
+  opt kid chưa có hoặc cache hết hạn
+    Organization -> Auth: GET /.well-known/jwks.json
+    Auth --> Organization: JWKS hiện hành
+  end
+  Organization -> Organization: authorize(permission, branch scope)
+  alt Có quyền và đúng phạm vi chi nhánh
+    Organization --> UI: Cho phép xử lý
+  else Thiếu quyền hoặc sai phạm vi
+    Organization --> UI: 401 JWT lỗi / 403 sai quyền hoặc scope
+  end
+end
+@enduml

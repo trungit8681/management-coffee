@@ -1,0 +1,87 @@
+@startuml
+title USE CASE TỔNG QUAN - HỆ THỐNG QUẢN LÝ CHUỖI COFFEE
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam actorStyle awesome
+
+actor "Người dùng" as User
+actor "Quản trị hệ thống" as Admin
+actor "Quản lý cửa hàng" as Manager
+actor "Nhân viên" as Staff
+actor "Khách hàng" as Customer
+actor "Đơn vị giao hàng" as DeliveryPartner
+actor "Nhà cung cấp" as Supplier
+
+User <|-- Admin
+User <|-- Manager
+User <|-- Staff
+User <|-- Customer
+
+rectangle "Hệ thống quản lý chuỗi cửa hàng Coffee" {
+  usecase "Xác thực tài khoản" as UC_Auth
+  usecase "Quản lý tài khoản\nvà phân quyền" as UC_RBAC
+  usecase "Quản lý chi nhánh" as UC_Branch
+  usecase "Quản lý nhân sự,\nlịch làm và chấm công" as UC_HR
+  usecase "Quản lý sản phẩm\nvà menu" as UC_Product
+  usecase "Quản lý kho\nvà nhà cung cấp" as UC_Inventory
+  usecase "Bán hàng tại POS" as UC_POS
+  usecase "Quản lý đơn hàng\nvà pha chế" as UC_Order
+  usecase "Quản lý khách hàng\nvà thành viên" as UC_CRM
+  usecase "Quản lý khuyến mãi" as UC_Promotion
+  usecase "Đặt món trực tuyến" as UC_OnlineOrder
+  usecase "Quản lý giao hàng" as UC_Delivery
+  usecase "Báo cáo và phân tích" as UC_Report
+  usecase "Cấu hình hệ thống" as UC_Setting
+  usecase "Ghi nhận thanh toán\ntiền mặt" as UC_Payment
+  usecase "Đặt mua nguyên liệu" as UC_Purchase
+}
+
+User -- UC_Auth
+
+Admin -- UC_RBAC
+Admin -- UC_Branch
+Admin -- UC_Product
+Admin -- UC_Promotion
+Admin -- UC_Report
+Admin -- UC_Setting
+
+Manager -- UC_Branch
+Manager -- UC_HR
+Manager -- UC_Product
+Manager -- UC_Inventory
+Manager -- UC_Order
+Manager -- UC_CRM
+Manager -- UC_Promotion
+Manager -- UC_Report
+
+Staff -- UC_HR
+Staff -- UC_POS
+Staff -- UC_Order
+Staff -- UC_CRM
+
+Customer -- UC_OnlineOrder
+Customer -- UC_CRM
+Customer -- UC_Promotion
+
+UC_POS ..> UC_Order : <<include>>
+UC_POS ..> UC_Payment : <<include>>
+UC_OnlineOrder ..> UC_Order : <<include>>
+UC_OnlineOrder ..> UC_Payment : <<include>>
+UC_Delivery ..> UC_OnlineOrder : <<extend>>
+UC_Purchase ..> UC_Inventory : <<extend>>\n[kho dưới định mức]
+
+DeliveryPartner -- UC_Delivery
+Supplier -- UC_Purchase
+
+note bottom of UC_Payment
+  Phạm vi hiện tại chỉ hỗ trợ tiền mặt.
+  Chuyển khoản và máy POS triển khai sau.
+end note
+
+note bottom of UC_RBAC
+  Quyền được giới hạn theo
+  vai trò, hành động và chi nhánh.
+end note
+@enduml

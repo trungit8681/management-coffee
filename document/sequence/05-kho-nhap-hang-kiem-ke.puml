@@ -1,0 +1,67 @@
+@startuml
+title SEQUENCE 05 - KHO, ĐẶT HÀNG, NHẬP HÀNG VÀ KIỂM KÊ
+autonumber
+hide footbox
+
+actor "Quản lý/Nhân viên kho" as Staff
+participant "Nhà cung cấp" as Supplier
+boundary "Trang quản trị kho" as UI
+control "Inventory Service" as Inventory
+control "Procurement Service" as Procurement
+control "Notification Service" as Notify
+database "Inventory DB" as DB
+database "Procurement DB" as ProcurementDB
+control "Audit Service" as Audit
+
+group Cảnh báo tồn thấp và lập đơn mua
+  Inventory -> DB: Tính tồn khả dụng theo chi nhánh
+  Inventory -> Inventory: So sánh định mức và dự báo
+  alt Tồn dưới ngưỡng
+    Inventory -> Notify: Gửi cảnh báo tồn thấp
+    Staff -> UI: Xem đề xuất và tạo đơn mua
+    UI -> Procurement: createPO(supplier, items, expectedDate)
+    Procurement -> ProcurementDB: Kiểm tra NCC, giá và quyền chi nhánh
+    Procurement -> ProcurementDB: Lưu PO trạng thái PENDING/APPROVED
+    Procurement -> Supplier: Gửi đơn đặt nguyên liệu
+    Supplier --> Procurement: Xác nhận số lượng/ngày giao
+    Procurement -> DB: Cập nhật PO CONFIRMED
+  end
+end
+
+group Nhập kho theo lô
+  Supplier -> Staff: Giao hàng + chứng từ
+  Staff -> UI: Quét PO, nhập số lượng/lô/HSD
+  UI -> Inventory: receiveGoods(PO, receivedItems)
+  Inventory -> Procurement: Đối chiếu PO và số đã nhận qua API
+  Procurement -> ProcurementDB: Đọc PO, hạn mức đã nhận
+  Procurement --> Inventory: Kết quả đối chiếu
+  alt Vượt số lượng/sai mặt hàng/HSD không đạt
+    Inventory --> UI: Đánh dấu sai lệch, yêu cầu xử lý
+  else Chấp nhận
+    Inventory -> DB: Tạo lô, phiếu nhập, tăng tồn
+    Inventory -> Procurement: Cập nhật số đã nhận của PO
+    Inventory -> Audit: Ghi nhận nhập kho
+    Inventory --> UI: Phiếu nhập thành công
+  end
+end
+
+group Kiểm kê và điều chỉnh
+  Staff -> UI: Bắt đầu kiểm kê
+  UI -> Inventory: createStocktake(branch, scope)
+  Inventory -> DB: Chụp tồn hệ thống và khóa phạm vi
+  loop Mỗi nguyên liệu/lô
+    Staff -> UI: Nhập số lượng thực tế
+    UI -> Inventory: recordCount(item, batch, actualQty)
+  end
+  Inventory -> Inventory: Tính chênh lệch
+  alt Có chênh lệch
+    Inventory --> UI: Yêu cầu lý do và phê duyệt
+    Staff -> UI: Gửi giải trình/phê duyệt
+    UI -> Inventory: approveAdjustment()
+    Inventory -> DB: Tạo bút toán điều chỉnh tồn
+    Inventory -> Audit: Ghi trước/sau, lý do, người duyệt
+  end
+  Inventory -> DB: Hoàn tất kiểm kê, mở khóa phạm vi
+  Inventory --> UI: Biên bản kiểm kê
+end
+@enduml

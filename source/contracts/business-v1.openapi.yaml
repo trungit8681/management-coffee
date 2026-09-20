@@ -1,0 +1,143 @@
+openapi: 3.1.0
+info:
+  title: Coffee business vertical-slice API
+  version: 0.1.0
+  description: Local implemented APIs. All requests enter Kong and each owning service verifies JWT action and branch scope.
+servers:
+  - url: http://localhost:8000
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
+  parameters:
+    IdempotencyKey: {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+    IfMatch: {name: If-Match, in: header, required: true, schema: {type: integer, minimum: 0}}
+  schemas:
+    Id: {type: string, format: uuid}
+    Error: {type: object, properties: {code: {type: string}}}
+    StockMovement:
+      type: object
+      required: [branchId, ingredientId, quantity, referenceId]
+      properties:
+        branchId: {$ref: '#/components/schemas/Id'}
+        ingredientId: {$ref: '#/components/schemas/Id'}
+        quantity: {type: integer, minimum: 1}
+        referenceId: {$ref: '#/components/schemas/Id'}
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/catalog/products:
+    post:
+      summary: Create product and first variant
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sku, name, category, variantCode, variantName]
+              properties: {sku: {type: string}, name: {type: string}, category: {type: string}, variantCode: {type: string}, variantName: {type: string}}
+      responses: {'201': {description: Product ID and variant ID}, '403': {description: Permission denied}, '409': {description: Duplicate SKU or idempotency conflict}}
+  /api/v1/catalog/variants/{variantId}/prices:
+    put:
+      summary: Publish new branch/channel price version
+      parameters: [{name: variantId, in: path, required: true, schema: {$ref: '#/components/schemas/Id'}}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [branchId, channel, unitPriceVnd]
+              properties: {branchId: {$ref: '#/components/schemas/Id'}, channel: {enum: [POS, PICKUP, DELIVERY]}, unitPriceVnd: {type: integer, minimum: 0}}
+      responses: {'200': {description: Price ID and version}, '403': {description: Branch permission denied}}
+  /api/v1/catalog/variants/{variantId}/sellable:
+    get:
+      summary: Read sellable branch/channel price for Order
+      parameters: [{name: variantId, in: path, required: true, schema: {$ref: '#/components/schemas/Id'}}, {name: branchId, in: query, required: true, schema: {$ref: '#/components/schemas/Id'}}, {name: channel, in: query, required: true, schema: {enum: [POS, PICKUP, DELIVERY]}}]
+      responses: {'200': {description: Price and version}, '404': {description: Item not sellable}}
+  /api/v1/orders:
+    post:
+      summary: Create immutable priced order
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [branchId, channel, items]
+              properties:
+                branchId: {$ref: '#/components/schemas/Id'}
+                channel: {enum: [POS, PICKUP, DELIVERY]}
+                items: {type: array, minItems: 1, items: {type: object, required: [variantId, quantity], properties: {variantId: {$ref: '#/components/schemas/Id'}, quantity: {type: integer, minimum: 1, maximum: 100}}}}
+      responses: {'201': {description: Order snapshot}, '409': {description: Menu or idempotency conflict}, '503': {description: Catalog unavailable}}
+  /api/v1/orders/{orderId}/cash-quote:
+    get:
+      summary: Read locked order cash amount
+      parameters: [{name: orderId, in: path, required: true, schema: {$ref: '#/components/schemas/Id'}}]
+      responses: {'200': {description: Branch, amount and cash status}, '409': {description: Not awaiting cash}}
+  /api/v1/orders/{orderId}/confirm-cash:
+    post:
+      summary: Confirm order after verifying Payment receipt
+      parameters: [{name: orderId, in: path, required: true, schema: {$ref: '#/components/schemas/Id'}}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [paymentId], properties: {paymentId: {$ref: '#/components/schemas/Id'}}}}}}
+      responses: {'200': {description: Confirmed order snapshot}, '409': {description: Receipt mismatch}}
+  /api/v1/orders/{orderId}/cancel:
+    post:
+      summary: Cancel unpaid order or request approved cash refund
+      parameters: [{name: orderId, in: path, required: true, schema: {$ref: '#/components/schemas/Id'}}, {$ref: '#/components/parameters/IfMatch'}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [reason], properties: {reason: {type: string}}}}}}
+      responses: {'200': {description: CANCELLED or REFUND_PENDING order}, '403': {description: Approval permission required}, '409': {description: Version/state conflict}}
+  /api/v1/payments/cash:
+    post:
+      summary: Record full cash collection and calculate change
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [orderId, cashReceivedVnd], properties: {orderId: {$ref: '#/components/schemas/Id'}, cashReceivedVnd: {type: integer, minimum: 1}}}}}}
+      responses: {'201': {description: Payment recorded and order confirmed}, '202': {description: Payment recorded; order confirmation pending}, '400': {description: Insufficient cash}, '409': {description: Duplicate order payment}}
+  /api/v1/payments/cash/refunds:
+    post:
+      summary: Record an approved full cash refund
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [orderId, reason], properties: {orderId: {$ref: '#/components/schemas/Id'}, reason: {type: string}}}}}}
+      responses: {'201': {description: Refund recorded and order marked refunded}, '202': {description: Refund recorded; order update pending}, '409': {description: Not approved or already refunded}}
+  /api/v1/inventory/receipts:
+    post:
+      summary: Receive branch stock with append-only ledger
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/StockMovement'}}}}
+      responses: {'201': {description: Movement ID}, '409': {description: Duplicate reference conflict}}
+  /api/v1/inventory/deductions:
+    post:
+      summary: Deduct stock without allowing negative balance
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/StockMovement'}}}}
+      responses: {'201': {description: Movement ID}, '409': {description: Insufficient stock or duplicate reference}}
+  /api/v1/procurement/purchase-orders:
+    post:
+      summary: Create pending purchase order
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [branchId, supplierId, ingredientId, quantity, unitCostVnd], properties: {branchId: {$ref: '#/components/schemas/Id'}, supplierId: {$ref: '#/components/schemas/Id'}, ingredientId: {$ref: '#/components/schemas/Id'}, quantity: {type: integer, minimum: 1}, unitCostVnd: {type: integer, minimum: 0}}}}}}
+      responses: {'201': {description: Purchase order ID}, '409': {description: Supplier or idempotency conflict}}
+  /api/v1/loyalty/reservations:
+    post:
+      summary: Reserve points by order ID using conditional wallet balance
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [customerId, orderId, points], properties: {customerId: {$ref: '#/components/schemas/Id'}, orderId: {$ref: '#/components/schemas/Id'}, points: {type: integer, minimum: 1}}}}}}
+      responses: {'201': {description: Point reservation}, '409': {description: Insufficient points or order conflict}}
+  /api/v1/promotions/reservations:
+    post:
+      summary: Reserve bounded voucher usage by order ID
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [branchId, orderId, code, totalVnd], properties: {branchId: {$ref: '#/components/schemas/Id'}, orderId: {$ref: '#/components/schemas/Id'}, code: {type: string}, totalVnd: {type: integer, minimum: 1}}}}}}
+      responses: {'201': {description: Voucher reservation}, '409': {description: Voucher unavailable or exhausted}}
+  /api/v1/fulfillment/deliveries:
+    post:
+      summary: Create delivery for confirmed delivery order
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [orderId, branchId, address], properties: {orderId: {$ref: '#/components/schemas/Id'}, branchId: {$ref: '#/components/schemas/Id'}, address: {type: string}}}}}}
+      responses: {'201': {description: Delivery ID}, '409': {description: Order not deliverable}}
+  /api/v1/notifications:
+    post:
+      summary: Queue an in-app notification
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [branchId, recipientId, referenceId, templateCode, variables], properties: {branchId: {$ref: '#/components/schemas/Id'}, recipientId: {$ref: '#/components/schemas/Id'}, referenceId: {$ref: '#/components/schemas/Id'}, templateCode: {type: string}, variables: {type: object}}}}}}
+      responses: {'202': {description: Queued notification}, '409': {description: Duplicate notification}}

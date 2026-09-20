@@ -1,0 +1,64 @@
+@startuml
+title SEQUENCE 09 - HỦY MÓN, HỦY ĐƠN VÀ HOÀN TIỀN
+autonumber
+hide footbox
+
+actor "Thu ngân" as Cashier
+actor "Trưởng ca/Quản lý" as Approver
+boundary "POS/Admin" as UI
+control "Order Service" as Order
+control "RBAC Service" as RBAC
+control "Payment Service" as Payment
+control "Inventory Service" as Inventory
+control "Promotion/Loyalty Service" as Benefit
+database "Order DB" as DB
+database "Payment DB" as PaymentDB
+control "Audit Service" as Audit
+
+Cashier -> UI: Chọn món/đơn và nhập lý do hủy
+UI -> Order: requestCancellation(target, reason)
+Order -> DB: Đọc trạng thái đơn, món, thanh toán
+Order -> RBAC: Kiểm tra quyền theo giá trị/trạng thái
+
+alt Chưa pha chế và chưa thanh toán
+  RBAC --> Order: Thu ngân được phép
+  Order -> DB: Hủy món/đơn
+  Order -> Benefit: Giải phóng voucher/điểm giữ chỗ
+  Order -> Audit: Ghi lý do và người thao tác
+  Order --> UI: Đã hủy
+else Vượt quyền hoặc đã pha chế/đã thanh toán
+  RBAC --> Order: Cần phê duyệt
+  Order --> UI: Tạo yêu cầu PENDING_APPROVAL
+  Approver -> UI: Xem tác động và xác nhận
+  UI -> RBAC: Kiểm tra hạn mức phê duyệt
+  alt Từ chối/không đủ quyền
+    RBAC --> UI: Deny
+    UI -> Order: Reject cancellation
+    Order -> Audit: Ghi nhận từ chối
+  else Phê duyệt
+    RBAC --> UI: Allow
+    UI -> Order: approveCancellation(requestId)
+    opt Món đã trừ kho nhưng chưa giao
+      Order -> Inventory: reverseDeduction(item, quantity)
+      Inventory -> DB: Hoàn tồn hoặc ghi nhận hỏng
+    end
+    opt Đơn đã thu tiền mặt
+      Order -> Payment: recordCashRefund(paymentId, refundableAmount)
+      Payment -> PaymentDB: Lưu giao dịch hoàn tiền mặt + outbox
+      Payment --> Order: Refund completed
+      Payment --> UI: Hiển thị số tiền mặt phải trả khách
+    end
+    Order -> Benefit: Hoàn điểm/cập nhật voucher theo chính sách
+    Order -> Payment: Xác minh biên nhận hoàn tiền mặt
+    Payment --> Order: refundId, số tiền, chi nhánh
+    Order -> DB: Cập nhật CANCELLED/REFUNDED
+    Order -> Audit: Ghi trước/sau, lý do, người duyệt
+    Order --> UI: Kết quả hủy và hoàn tiền
+  end
+end
+
+note over UI,Payment
+  Phạm vi hiện tại chỉ hoàn tiền mặt tại quầy.
+  Hoàn chuyển khoản/máy POS sẽ được bổ sung sau.
+end note
+@enduml

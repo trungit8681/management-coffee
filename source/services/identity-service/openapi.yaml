@@ -1,0 +1,90 @@
+openapi: 3.1.0
+info:
+  title: Coffee Identity Service API
+  version: 1.0.0
+servers:
+  - url: /api/v1
+paths:
+  /.well-known/jwks.json:
+    get:
+      servers: [{url: /}]
+      summary: Publish active public JWT verification keys
+      responses:
+        '200': {description: JSON Web Key Set; never contains private key material}
+  /auth/login:
+    post:
+      summary: Authenticate and create a device refresh session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LoginRequest'}
+      responses:
+        '200': {description: Token pair, content: {application/json: {schema: {$ref: '#/components/schemas/TokenPair'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '423': {description: Account locked or disabled}
+  /auth/token/refresh:
+    post:
+      summary: Rotate a refresh token and issue a new token pair
+      requestBody: {$ref: '#/components/requestBodies/RefreshToken'}
+      responses:
+        '200': {description: Rotated token pair, content: {application/json: {schema: {$ref: '#/components/schemas/TokenPair'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {description: Refresh session is being rotated}
+  /auth/logout:
+    post:
+      security: [{bearerAuth: []}]
+      requestBody: {$ref: '#/components/requestBodies/RefreshToken'}
+      responses: {'204': {description: Session revoked}, '401': {$ref: '#/components/responses/Unauthorized'}}
+  /identity/me:
+    get:
+      security: [{bearerAuth: []}]
+      responses: {'200': {description: Current profile and effective authorization}, '401': {$ref: '#/components/responses/Unauthorized'}}
+  /identity/users:
+    post:
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, maxLength: 200}}
+      responses:
+        '201': {description: Account created or original result replayed}
+        '409': {description: Idempotency key reused with different request or account conflict}
+        '403': {description: Missing identity:create}
+  /identity/users/{userId}/status:
+    patch:
+      security: [{bearerAuth: []}]
+      parameters: [{name: userId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses: {'204': {description: Status changed and sessions revoked}, '403': {description: Missing identity:change_status}}
+  /identity/users/{userId}/role-assignments:
+    post:
+      security: [{bearerAuth: []}]
+      parameters: [{name: userId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses: {'201': {description: Scoped role assignment created}, '403': {description: Missing permission or branch scope}}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
+  requestBodies:
+    RefreshToken:
+      required: true
+      content: {application/json: {schema: {type: object, required: [refreshToken], properties: {refreshToken: {type: string}}}}}
+  responses:
+    Unauthorized: {description: Authentication failed}
+  schemas:
+    LoginRequest:
+      type: object
+      required: [identifier, password, deviceId]
+      properties:
+        identifier: {type: string}
+        password: {type: string, format: password}
+        deviceId: {type: string}
+        deviceName: {type: string}
+    TokenPair:
+      type: object
+      required: [accessToken, accessExpiresAt, refreshToken, refreshExpiresAt, permissions, branchScopes, globalScope]
+      properties:
+        accessToken: {type: string}
+        accessExpiresAt: {type: string, format: date-time}
+        refreshToken: {type: string}
+        refreshExpiresAt: {type: string, format: date-time}
+        permissions: {type: array, items: {type: string}}
+        branchScopes: {type: array, items: {type: string, format: uuid}}
+        globalScope: {type: boolean}

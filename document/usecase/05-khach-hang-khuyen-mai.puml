@@ -1,0 +1,84 @@
+@startuml
+title USE CASE - KHÁCH HÀNG, THÀNH VIÊN VÀ KHUYẾN MÃI
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam actorStyle awesome
+
+actor "Khách hàng" as Customer
+actor "Nhân viên" as Staff
+actor "Quản lý cửa hàng" as Manager
+actor "Quản trị hệ thống" as Admin
+
+rectangle "Website / ứng dụng khách hàng" {
+  usecase "Đăng ký tài khoản" as Register
+  usecase "Tìm cửa hàng" as FindStore
+  usecase "Xem menu và tình trạng món" as BrowseMenu
+  usecase "Xem chương trình khuyến mãi" as ViewPromotion
+  usecase "Quản lý giỏ hàng" as Cart
+  usecase "Tùy chỉnh món" as Customize
+  usecase "Đặt món" as PlaceOrder
+  usecase "Chọn phương thức nhận món" as Fulfillment
+  usecase "Áp dụng voucher" as ApplyVoucher
+  usecase "Sử dụng điểm" as UsePoint
+  usecase "Theo dõi đơn" as TrackOrder
+  usecase "Xem lịch sử mua hàng" as History
+  usecase "Đặt lại đơn cũ" as Reorder
+  usecase "Lưu món yêu thích" as Favorite
+  usecase "Đánh giá món / cửa hàng" as Review
+  usecase "Gửi phản hồi / khiếu nại" as Feedback
+}
+
+rectangle "CRM và khách hàng thân thiết" {
+  usecase "Quản lý hồ sơ khách hàng" as CustomerProfile
+  usecase "Quản lý hạng thành viên" as Tier
+  usecase "Tích điểm" as EarnPoint
+  usecase "Đổi điểm / quà tặng" as Redeem
+  usecase "Quản lý lịch sử điểm" as PointHistory
+  usecase "Quản lý chương trình khuyến mãi" as Promotion
+  usecase "Thiết lập điều kiện áp dụng" as PromotionRule
+  usecase "Phát hành voucher" as IssueVoucher
+  usecase "Kiểm tra điều kiện voucher" as ValidateVoucher
+  usecase "Xử lý phản hồi khách hàng" as HandleFeedback
+}
+
+Customer -- Register
+Customer -- FindStore
+Customer -- BrowseMenu
+Customer -- ViewPromotion
+Customer -- Cart
+Customer -- PlaceOrder
+Customer -- ApplyVoucher
+Customer -- UsePoint
+Customer -- TrackOrder
+Customer -- History
+Customer -- Reorder
+Customer -- Favorite
+Customer -- Review
+Customer -- Feedback
+Customer -- Redeem
+Customer -- PointHistory
+
+Staff -- CustomerProfile
+Staff -- EarnPoint
+Staff -- HandleFeedback
+Manager -- Promotion
+Manager -- HandleFeedback
+Admin -- Tier
+Admin -- Promotion
+Admin -- IssueVoucher
+
+Customize ..> Cart : <<extend>>
+PlaceOrder ..> Cart : <<include>>
+PlaceOrder ..> Fulfillment : <<include>>
+ApplyVoucher ..> ValidateVoucher : <<include>>
+UsePoint ..> PointHistory : <<include>>
+EarnPoint ..> PointHistory : <<include>>
+Reorder ..> History : <<extend>>
+Reorder ..> Cart : <<include>>
+Promotion ..> PromotionRule : <<include>>
+IssueVoucher ..> Promotion : <<include>>
+Feedback ..> HandleFeedback : <<include>>
+@enduml
+

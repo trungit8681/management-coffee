@@ -1,0 +1,81 @@
+@startuml
+title USE CASE - BÁO CÁO, PHÂN TÍCH VÀ KIỂM SOÁT
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam actorStyle awesome
+
+actor "Quản trị hệ thống" as Admin
+actor "Quản lý cửa hàng" as Manager
+actor "Trưởng ca" as Leader
+
+rectangle "Báo cáo và phân tích" {
+  usecase "Xem dashboard thời gian thực" as Dashboard
+  usecase "Báo cáo doanh thu" as Revenue
+  usecase "Báo cáo theo chi nhánh" as BranchReport
+  usecase "Báo cáo theo kênh bán" as ChannelReport
+  usecase "Phân tích sản phẩm bán chạy" as ProductReport
+  usecase "Báo cáo chi phí nguyên liệu" as CostReport
+  usecase "Báo cáo lợi nhuận gộp" as ProfitReport
+  usecase "Phân tích hiệu quả khuyến mãi" as PromotionReport
+  usecase "Phân tích khách hàng" as CustomerReport
+  usecase "Báo cáo hiệu suất nhân viên" as StaffReport
+  usecase "Báo cáo hủy đơn / hoàn tiền mặt" as CancelReport
+  usecase "Báo cáo chênh lệch ca" as ShiftVariance
+  usecase "Dự báo nhu cầu" as DemandForecast
+  usecase "Dự báo tồn kho" as StockForecast
+  usecase "Xuất báo cáo" as ExportReport
+}
+
+rectangle "Kiểm soát hệ thống" {
+  usecase "Xem nhật ký thao tác" as AuditLog
+  usecase "Theo dõi thay đổi giá" as PriceAudit
+  usecase "Theo dõi điều chỉnh kho" as StockAudit
+  usecase "Theo dõi giảm giá thủ công" as DiscountAudit
+  usecase "Theo dõi hủy đơn / hoàn tiền mặt" as RefundAudit
+}
+
+Admin -- Dashboard
+Admin -- Revenue
+Admin -- BranchReport
+Admin -- ChannelReport
+Admin -- ProductReport
+Admin -- CostReport
+Admin -- ProfitReport
+Admin -- PromotionReport
+Admin -- CustomerReport
+Admin -- StaffReport
+Admin -- CancelReport
+Admin -- DemandForecast
+Admin -- StockForecast
+Admin -- AuditLog
+
+Manager -- Dashboard
+Manager -- Revenue
+Manager -- ProductReport
+Manager -- CostReport
+Manager -- PromotionReport
+Manager -- CustomerReport
+Manager -- StaffReport
+Manager -- CancelReport
+Manager -- ShiftVariance
+Manager -- StockForecast
+Manager -- AuditLog
+
+Leader -- ShiftVariance
+Leader -- CancelReport
+
+Revenue ..> BranchReport : <<extend>>
+Revenue ..> ChannelReport : <<extend>>
+ProfitReport ..> Revenue : <<include>>
+ProfitReport ..> CostReport : <<include>>
+DemandForecast ..> ProductReport : <<include>>
+StockForecast ..> DemandForecast : <<include>>
+ExportReport ..> Dashboard : <<extend>>
+
+PriceAudit ..> AuditLog : <<extend>>
+StockAudit ..> AuditLog : <<extend>>
+DiscountAudit ..> AuditLog : <<extend>>
+RefundAudit ..> AuditLog : <<extend>>
+@enduml

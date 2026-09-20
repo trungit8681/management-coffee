@@ -1,0 +1,52 @@
+@startuml
+title SEQUENCE 11 - BÁO CÁO, DASHBOARD VÀ NHẬT KÝ KIỂM SOÁT
+autonumber
+hide footbox
+
+actor "Quản trị/Quản lý/Trưởng ca" as User
+boundary "Dashboard" as UI
+control "RBAC Service" as RBAC
+control "Reporting Service" as Report
+control "Audit Query Service" as Audit
+database "Analytics Warehouse" as DWH
+database "Audit Store" as AuditDB
+control "Export Service" as Export
+
+User -> UI: Chọn báo cáo, thời gian,\nchi nhánh, kênh bán
+UI -> RBAC: resolveDataScope(user, report, branches)
+alt Không có quyền xem chỉ tiêu/phạm vi
+  RBAC --> UI: 403 hoặc loại bỏ trường nhạy cảm
+else Có quyền
+  RBAC --> UI: allowedBranches + allowedMetrics
+  UI -> Report: query(reportType, filters, scope)
+  Report -> Report: Chuẩn hóa múi giờ, trạng thái đơn,\nthuế, hoàn tiền mặt và đơn hủy
+  Report -> DWH: Truy vấn dữ liệu tổng hợp
+  alt Dữ liệu tổng hợp chưa cập nhật
+    DWH --> Report: watermark cũ
+    Report -> DWH: Truy vấn delta gần thời gian thực
+  end
+  DWH --> Report: Dataset + watermark
+  Report -> Report: Tính doanh thu, AOV, chi phí,\nlợi nhuận, chênh lệch, tỷ lệ hủy
+  Report --> UI: Chỉ tiêu + biểu đồ + thời điểm dữ liệu
+  UI --> User: Hiển thị dashboard
+end
+
+opt Xem chi tiết thao tác nhạy cảm
+  User -> UI: Mở hủy đơn/hoàn tiền mặt/\nđiều chỉnh kho/thay đổi giá
+  UI -> RBAC: Kiểm tra quyền audit theo chi nhánh
+  RBAC --> UI: scope cho phép
+  UI -> Audit: search(eventType, actor, time, scope)
+  Audit -> AuditDB: Đọc sự kiện bất biến
+  AuditDB --> Audit: before/after, reason, approver, device
+  Audit --> UI: Danh sách có phân trang
+end
+
+opt Xuất báo cáo
+  User -> UI: Chọn Excel/PDF
+  UI -> Export: createExport(reportId, filters, scope)
+  Export -> RBAC: Kiểm tra lại quyền tại thời điểm xuất
+  Export -> DWH: Lấy dữ liệu trong phạm vi
+  Export -> Export: Tạo file và checksum
+  Export --> UI: Liên kết tải có thời hạn
+end
+@enduml

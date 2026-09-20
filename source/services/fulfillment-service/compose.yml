@@ -1,0 +1,37 @@
+name: coffee-fulfillment
+services:
+  fulfillment-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: fulfillment
+      POSTGRES_USER: fulfillment_app
+      POSTGRES_PASSWORD: ${FULFILLMENT_DB_PASSWORD:?Set FULFILLMENT_DB_PASSWORD in .env}
+    ports: ["${FULFILLMENT_DB_PORT:-5444}:5432"]
+    volumes: [fulfillment_db_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fulfillment_app -d fulfillment"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+  fulfillment-service:
+    build: {context: ., dockerfile: Dockerfile}
+    environment:
+      SERVICE_NAME: fulfillment
+      FULFILLMENT_DB_URL: "postgresql://fulfillment_app:${FULFILLMENT_DB_PASSWORD:?Set FULFILLMENT_DB_PASSWORD in .env}@fulfillment-db:5432/fulfillment"
+      FULFILLMENT_JWKS_URI: ${FULFILLMENT_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
+      FULFILLMENT_ORDER_BASE_URL: ${FULFILLMENT_ORDER_BASE_URL:-http://host.docker.internal:8086/}
+      PORT: 8080
+    ports: ["${FULFILLMENT_SERVICE_PORT:-8090}:8080"]
+    depends_on:
+      fulfillment-db: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+volumes:
+  fulfillment_db_data: {name: coffee_fulfillment_standalone_db_data}

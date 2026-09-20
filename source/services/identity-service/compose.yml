@@ -1,0 +1,78 @@
+name: coffee-identity
+
+services:
+  identity-redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${IDENTITY_REDIS_PORT:-6379}:6379"
+    volumes:
+      - identity_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  identity-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: identity
+      POSTGRES_USER: identity_app
+      POSTGRES_PASSWORD: ${IDENTITY_DB_PASSWORD:?Set IDENTITY_DB_PASSWORD in .env}
+    ports:
+      - "${IDENTITY_DB_PORT:-5433}:5432"
+    volumes:
+      - identity_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U identity_app -d identity"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  identity-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      IDENTITY_DB_URL: jdbc:postgresql://identity-db:5432/identity
+      IDENTITY_DB_USERNAME: identity_app
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?Set IDENTITY_DB_PASSWORD in .env}
+      IDENTITY_DB_POOL_SIZE: 10
+      IDENTITY_REDIS_HOST: identity-redis
+      IDENTITY_REDIS_PORT: 6379
+      IDENTITY_JWT_KEY_ID: ${IDENTITY_JWT_KEY_ID:-local-dev-1}
+      IDENTITY_JWT_PRIVATE_KEY_PATH: /var/lib/identity/keys/jwt-private.pem
+      IDENTITY_JWT_PUBLIC_KEY_PATH: /var/lib/identity/keys/jwt-public.pem
+      IDENTITY_JWT_GENERATE_IF_MISSING: "true"
+      IDENTITY_BOOTSTRAP_ADMIN_USERNAME: ${IDENTITY_BOOTSTRAP_ADMIN_USERNAME:-}
+      IDENTITY_BOOTSTRAP_ADMIN_PASSWORD: ${IDENTITY_BOOTSTRAP_ADMIN_PASSWORD:-}
+      IDENTITY_BOOTSTRAP_ADMIN_DISPLAY_NAME: ${IDENTITY_BOOTSTRAP_ADMIN_DISPLAY_NAME:-System Administrator}
+      PORT: 8080
+    ports:
+      - "${IDENTITY_SERVICE_PORT:-8080}:8080"
+    depends_on:
+      identity-db:
+        condition: service_healthy
+      identity-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    volumes:
+      - identity_signing_keys:/var/lib/identity/keys
+
+volumes:
+  identity_db_data:
+    name: coffee_identity_db_data
+  identity_redis_data:
+    name: coffee_identity_redis_data
+  identity_signing_keys:
+    name: coffee_identity_signing_keys

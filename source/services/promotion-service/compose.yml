@@ -1,0 +1,36 @@
+name: coffee-promotion
+services:
+  promotion-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: promotion
+      POSTGRES_USER: promotion_app
+      POSTGRES_PASSWORD: ${PROMOTION_DB_PASSWORD:?Set PROMOTION_DB_PASSWORD in .env}
+    ports: ["${PROMOTION_DB_PORT:-5443}:5432"]
+    volumes: [promotion_db_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U promotion_app -d promotion"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+  promotion-service:
+    build: {context: ., dockerfile: Dockerfile}
+    environment:
+      SERVICE_NAME: promotion
+      PROMOTION_DB_URL: "postgresql://promotion_app:${PROMOTION_DB_PASSWORD:?Set PROMOTION_DB_PASSWORD in .env}@promotion-db:5432/promotion"
+      PROMOTION_JWKS_URI: ${PROMOTION_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
+      PORT: 8080
+    ports: ["${PROMOTION_SERVICE_PORT:-8088}:8080"]
+    depends_on:
+      promotion-db: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+volumes:
+  promotion_db_data: {name: coffee_promotion_standalone_db_data}

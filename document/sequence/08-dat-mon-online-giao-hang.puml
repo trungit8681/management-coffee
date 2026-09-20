@@ -1,0 +1,76 @@
+@startuml
+title SEQUENCE 08 - ĐẶT MÓN TRỰC TUYẾN VÀ GIAO HÀNG
+autonumber
+hide footbox
+
+actor "Khách hàng" as Customer
+actor "Nhân viên/Tài xế thu tiền" as Collector
+boundary "Website/App" as App
+control "Store/Menu Service" as Menu
+control "Cart Service" as Cart
+control "Order Service" as Order
+control "Promotion Service" as Promo
+control "Payment Service" as Payment
+control "Delivery Service" as Delivery
+participant "Đơn vị giao hàng" as Partner
+control "Notification Service" as Notify
+database "Order DB" as DB
+
+Customer -> App: Chọn vị trí/phương thức nhận món
+App -> Menu: Tìm chi nhánh phục vụ địa chỉ
+Menu -> Menu: Kiểm tra giờ mở cửa, vùng giao,\nkhả năng nhận đơn và menu kênh online
+alt Không có chi nhánh khả dụng
+  Menu --> App: Không thể phục vụ địa chỉ/thời điểm
+else Có chi nhánh
+  Menu --> App: Chi nhánh, ETA, menu, giá
+  loop Chọn món
+    Customer -> App: Thêm/tùy chỉnh món
+    App -> Cart: addItem(branch, item, options)
+    Cart -> Menu: Xác minh bán được và giá hiện tại
+    Menu --> Cart: OK/không khả dụng
+    Cart --> App: Giỏ hàng cập nhật
+  end
+  Customer -> App: Chọn địa chỉ/thời gian/voucher
+  App -> Promo: Kiểm tra ưu đãi
+  Promo --> App: Giảm giá hợp lệ hoặc lý do từ chối
+  App -> Order: checkout(cart, customer, fulfillment)
+  Order -> Menu: Kiểm tra lại giá và tồn khả dụng
+  alt Giá/menu đã thay đổi
+    Menu --> Order: Conflict
+    Order --> App: Yêu cầu khách xác nhận giỏ mới
+  else Hợp lệ
+    Order -> DB: Tạo đơn CONFIRMED,
+paymentStatus = PENDING_CASH
+    Order -> Payment: Tạo yêu cầu thu tiền mặt khi bàn giao
+    alt Giao tận nơi
+      Order -> Delivery: createDelivery(order, address, SLA)
+      Delivery -> Partner: Yêu cầu báo giá/phân tài xế
+      alt Không tìm được tài xế
+        Partner --> Delivery: REJECTED/TIMEOUT
+        Delivery -> Notify: Báo cửa hàng và khách xử lý
+      else Nhận giao
+        Partner --> Delivery: driver + tracking
+        Delivery -> DB: Lưu vận đơn
+        Delivery -> Notify: Gửi thông tin theo dõi và số tiền cần thu
+      end
+    else Nhận tại quầy/đặt trước
+      Order -> Notify: Xác nhận giờ nhận và thanh toán tiền mặt tại quầy
+    end
+    Order --> App: Mã đơn, số tiền mặt cần trả và trạng thái
+  end
+end
+
+opt Khi bàn giao đơn thành công
+  Customer -> Collector: Trả tiền mặt
+  Collector -> App: Xác nhận số tiền đã thu
+  App -> Payment: recordCashPayment(orderId, cashReceived)
+  Payment -> DB: Lưu giao dịch tiền mặt
+  Payment -> Order: Mark paymentStatus = PAID
+  Order --> App: Xác nhận đã thanh toán
+end
+
+note over Customer,Payment
+  Hiện tại không thanh toán trực tuyến.
+  Khách thanh toán tiền mặt khi nhận món.
+end note
+@enduml

@@ -1,0 +1,36 @@
+name: coffee-notification
+services:
+  notification-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: notification
+      POSTGRES_USER: notification_app
+      POSTGRES_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?Set NOTIFICATION_DB_PASSWORD in .env}
+    ports: ["${NOTIFICATION_DB_PORT:-5445}:5432"]
+    volumes: [notification_db_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notification_app -d notification"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+  notification-service:
+    build: {context: ., dockerfile: Dockerfile}
+    environment:
+      SERVICE_NAME: notification
+      NOTIFICATION_DB_URL: "postgresql://notification_app:${NOTIFICATION_DB_PASSWORD:?Set NOTIFICATION_DB_PASSWORD in .env}@notification-db:5432/notification"
+      NOTIFICATION_JWKS_URI: ${NOTIFICATION_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
+      PORT: 8080
+    ports: ["${NOTIFICATION_SERVICE_PORT:-8089}:8080"]
+    depends_on:
+      notification-db: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+volumes:
+  notification_db_data: {name: coffee_notification_standalone_db_data}

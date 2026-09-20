@@ -1,0 +1,38 @@
+name: coffee-payment
+services:
+  payment-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: payment
+      POSTGRES_USER: payment_app
+      POSTGRES_PASSWORD: ${PAYMENT_DB_PASSWORD:-admin1234}
+    ports: ["${PAYMENT_DB_PORT:-5439}:5432"]
+    volumes: [payment_db_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payment_app -d payment"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+  payment-service:
+    build: {context: ., dockerfile: Dockerfile}
+    environment:
+      PAYMENT_DB_URL: jdbc:postgresql://payment-db:5432/payment
+      PAYMENT_DB_USERNAME: payment_app
+      PAYMENT_DB_PASSWORD: ${PAYMENT_DB_PASSWORD:-admin1234}
+      PAYMENT_JWKS_URI: ${PAYMENT_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
+      PAYMENT_ORDER_BASE_URL: ${PAYMENT_ORDER_BASE_URL:-http://host.docker.internal:8086/}
+      PORT: 8080
+    ports: ["${PAYMENT_SERVICE_PORT:-8085}:8080"]
+    depends_on:
+      payment-db: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+volumes:
+  payment_db_data: {name: coffee_payment_standalone_db_data}

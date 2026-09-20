@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Kien truc tong quan Coffee Management",
+    "quality_profile": "showcase",
+    "viewBox": [1280, 720],
+    "views": [
+      {"id": "request", "label": "Request path", "focus": ["clients", "kong", "identity", "contexts"], "note": "Request qua Kong, JWT va bounded context."},
+      {"id": "data", "label": "Data ownership", "focus": ["contexts", "postgres", "outbox"], "note": "Moi service so huu PostgreSQL rieng."}
+    ]
+  },
+  "components": [
+    {"id": "clients", "type": "frontend", "label": "Ung dung", "sublabel": "POS, quan tri, khach hang", "pos": [40, 290], "size": [170, 78]},
+    {"id": "kong", "type": "cloud", "label": "Kong API Gateway", "sublabel": "Routing va rate limit", "pos": [270, 290], "size": [190, 78]},
+    {"id": "identity", "type": "security", "label": "Identity Service", "sublabel": "JWT RS256, quyen, phien", "pos": [530, 90], "size": [210, 82]},
+    {"id": "organization", "type": "backend", "label": "Organization Service", "sublabel": "Chi nhanh, nhan vien, ca", "pos": [530, 220], "size": [210, 82]},
+    {"id": "contexts", "type": "backend", "label": "Business Services", "sublabel": "Catalog, Order, Payment, Inventory va 5 service khac", "pos": [530, 365], "size": [290, 92]},
+    {"id": "postgres", "type": "database", "label": "PostgreSQL", "sublabel": "Mot database cho moi service", "brand": "postgresql", "pos": [950, 205], "size": [230, 86]},
+    {"id": "outbox", "type": "messagebus", "label": "Transactional Outbox", "sublabel": "Event trong transaction cuc bo", "pos": [950, 385], "size": [230, 82]},
+    {"id": "external", "type": "external", "label": "External Adapters", "sublabel": "Giao hang, email, SMS tuong lai", "pos": [950, 545], "size": [240, 82]}
+  ],
+  "boundaries": [
+    {"kind": "security-group", "label": "Public API", "wraps": ["clients", "kong"], "pad": 18},
+    {"kind": "region", "label": "Bounded contexts", "wraps": ["identity", "organization", "contexts"], "pad": 22},
+    {"kind": "region", "label": "Data layer", "wraps": ["postgres", "outbox"], "pad": 22}
+  ],
+  "connections": [
+    {"id": "c1", "from": "clients", "to": "kong", "label": "HTTPS", "variant": "emphasis"},
+    {"id": "c2", "from": "kong", "to": "identity", "label": "Auth va JWKS", "variant": "security"},
+    {"id": "c3", "from": "kong", "to": "organization"},
+    {"id": "c4", "from": "kong", "to": "contexts", "label": "Business API", "variant": "emphasis"},
+    {"id": "c5", "from": "identity", "to": "contexts", "label": "JWT claims", "variant": "security", "fromSide": "right", "toSide": "right", "via": [[860, 131], [860, 411]], "labelAt": [900, 180]},
+    {"id": "c6", "from": "contexts", "to": "postgres", "label": "SQL, DB rieng", "labelAt": [920, 330]},
+    {"id": "c7", "from": "contexts", "to": "outbox", "label": "Atomic event", "labelAt": [925, 490]},
+    {"id": "c8", "from": "contexts", "to": "external", "label": "Adapter tuong lai", "variant": "dashed"}
+  ],
+  "cards": [
+    {"dot": "cyan", "title": "So huu du lieu", "items": ["Moi service co PostgreSQL rieng", "Khong doc schema cua service khac", "ACID trong mot service"]},
+    {"dot": "violet", "title": "Bao mat", "items": ["Identity phat hanh JWT RS256", "Service kiem tra action va branch scope", "Public API qua Kong"]},
+    {"dot": "amber", "title": "Pham vi hien tai", "items": ["Thanh toan tien mat", "Outbox chua co relay hoan chinh", "Adapter ngoai la buoc tiep theo"]}
+  ]
+}

@@ -1,0 +1,57 @@
+@startuml
+title USE CASE - TÀI KHOẢN VÀ PHÂN QUYỀN
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam actorStyle awesome
+
+actor "Người dùng" as User
+actor "Quản trị hệ thống" as Admin
+actor "Quản lý cửa hàng" as Manager
+
+rectangle "Tài khoản và phân quyền" {
+  usecase "Đăng nhập" as Login
+  usecase "Đăng xuất" as Logout
+  usecase "Khôi phục mật khẩu" as ResetPassword
+  usecase "Xác thực thông tin" as Validate
+  usecase "Xem hồ sơ cá nhân" as ViewProfile
+  usecase "Cập nhật hồ sơ cá nhân" as UpdateProfile
+  usecase "Đổi mật khẩu" as ChangePassword
+  usecase "Tạo tài khoản" as CreateAccount
+  usecase "Khóa / mở khóa tài khoản" as LockAccount
+  usecase "Tạo vai trò" as CreateRole
+  usecase "Gán quyền cho vai trò" as AssignPermission
+  usecase "Gán vai trò cho nhân viên" as AssignRole
+  usecase "Giới hạn quyền theo chi nhánh" as BranchScope
+  usecase "Xem nhật ký đăng nhập" as LoginLog
+}
+
+User -- Login
+User -- Logout
+User -- ResetPassword
+User -- ViewProfile
+User -- UpdateProfile
+User -- ChangePassword
+
+Admin -- CreateAccount
+Admin -- LockAccount
+Admin -- CreateRole
+Admin -- AssignPermission
+Admin -- AssignRole
+Admin -- BranchScope
+Admin -- LoginLog
+
+Manager -- AssignRole
+
+Login ..> Validate : <<include>>
+ResetPassword ..> Validate : <<include>>
+UpdateProfile ..> Validate : <<include>>
+AssignRole ..> BranchScope : <<include>>
+
+note right of AssignRole
+  Quản lý cửa hàng chỉ gán các vai trò
+  nằm trong phạm vi được quản trị cấp.
+end note
+@enduml
+

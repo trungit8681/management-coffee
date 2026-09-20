@@ -1,0 +1,3 @@
+# Promotion Service
+
+Owns vouchers and reservation counters. Voucher scope is one branch, with minimum order amount, fixed VND discount, expiry and usage limit. Reservation increments a counter with a conditional PostgreSQL update; unique order ID and status guard duplicate commit/release. `promotion:manage`, `promotion:reserve` and `promotion:commit` enforce action and branch scope. This slice does not verify the order total against Order or automatically join checkout; caller permissions must remain restricted until that integration exists. Local standalone configuration and deployment are in `source/services/promotion-service/.env.example` and `compose.yml`; integrated configuration is in `source/.env.example` and `source/compose-business.yml`.

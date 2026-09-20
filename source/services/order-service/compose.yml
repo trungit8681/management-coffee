@@ -1,0 +1,39 @@
+name: coffee-order
+services:
+  order-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: orders
+      POSTGRES_USER: order_app
+      POSTGRES_PASSWORD: ${ORDER_DB_PASSWORD:-admin1234}
+    ports: ["${ORDER_DB_PORT:-5438}:5432"]
+    volumes: [order_db_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U order_app -d orders"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+  order-service:
+    build: {context: ., dockerfile: Dockerfile}
+    environment:
+      ORDER_DB_URL: jdbc:postgresql://order-db:5432/orders
+      ORDER_DB_USERNAME: order_app
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:-admin1234}
+      ORDER_JWKS_URI: ${ORDER_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
+      ORDER_CATALOG_BASE_URL: ${ORDER_CATALOG_BASE_URL:-http://host.docker.internal:8082/}
+      ORDER_PAYMENT_BASE_URL: ${ORDER_PAYMENT_BASE_URL:-http://host.docker.internal:8085/}
+      PORT: 8080
+    ports: ["${ORDER_SERVICE_PORT:-8086}:8080"]
+    depends_on:
+      order-db: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+volumes:
+  order_db_data: {name: coffee_order_standalone_db_data}

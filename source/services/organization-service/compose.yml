@@ -1,0 +1,37 @@
+name: coffee-organization
+services:
+  organization-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: organization
+      POSTGRES_USER: organization_app
+      POSTGRES_PASSWORD: ${ORGANIZATION_DB_PASSWORD:?Set ORGANIZATION_DB_PASSWORD in .env}
+    ports: ["${ORGANIZATION_DB_PORT:-5434}:5432"]
+    volumes: ["organization_db_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U organization_app -d organization"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+  organization-service:
+    build: {context: ., dockerfile: Dockerfile}
+    environment:
+      ORGANIZATION_DB_URL: jdbc:postgresql://organization-db:5432/organization
+      ORGANIZATION_DB_USERNAME: organization_app
+      ORGANIZATION_DB_PASSWORD: ${ORGANIZATION_DB_PASSWORD:?Set ORGANIZATION_DB_PASSWORD in .env}
+      ORGANIZATION_JWKS_URI: ${ORGANIZATION_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
+      PORT: 8080
+    ports: ["${ORGANIZATION_SERVICE_PORT:-8081}:8080"]
+    depends_on:
+      organization-db: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD","curl","--fail","--silent","http://127.0.0.1:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+volumes:
+  organization_db_data: {name: coffee_organization_db_data}

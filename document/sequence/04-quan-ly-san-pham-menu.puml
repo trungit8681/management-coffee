@@ -1,0 +1,51 @@
+@startuml
+title SEQUENCE 04 - QUẢN LÝ SẢN PHẨM, MENU VÀ CÔNG THỨC
+autonumber
+hide footbox
+
+actor "Quản trị/Quản lý" as Manager
+boundary "Trang quản trị" as UI
+control "Catalog Service" as Catalog
+control "Pricing Service" as Pricing
+control "Recipe Service" as Recipe
+control "Inventory Service" as Inventory
+control "Menu Cache" as Cache
+database "Product DB" as DB
+control "Audit Service" as Audit
+
+Manager -> UI: Tạo/cập nhật sản phẩm
+UI -> Catalog: saveProduct(SKU, tên, loại, thuế,\nsize, tùy chọn, topping, trạng thái)
+Catalog -> DB: Kiểm tra SKU/mã vạch duy nhất
+alt Trùng SKU hoặc dữ liệu sai
+  Catalog --> UI: Trả lỗi theo trường
+else Hợp lệ
+  Catalog -> DB: Lưu sản phẩm và biến thể
+  Catalog --> UI: productId/version
+end
+
+Manager -> UI: Khai báo công thức theo size
+UI -> Recipe: saveRecipe(productVariant, ingredients)
+Recipe -> Inventory: Kiểm tra nguyên liệu, đơn vị quy đổi
+alt Nguyên liệu/đơn vị không hợp lệ
+  Inventory --> Recipe: Danh sách lỗi
+  Recipe --> UI: Yêu cầu chỉnh công thức
+else Hợp lệ
+  Inventory --> Recipe: ingredientIds + conversion factors
+  Recipe -> DB: Lưu phiên bản công thức
+  Recipe -> Audit: Ghi nhận thay đổi công thức
+  Recipe --> UI: Công thức đã lưu
+end
+
+Manager -> UI: Thiết lập giá theo chi nhánh/kênh
+UI -> Pricing: savePrice(product, branch, channel,\nprice, effectiveTime)
+Pricing -> Pricing: Kiểm tra giá, thuế và thời gian hiệu lực
+alt Khoảng hiệu lực bị chồng lấn
+  Pricing --> UI: Cảnh báo và từ chối
+else Hợp lệ
+  Pricing -> DB: Lưu bảng giá phiên bản mới
+  Pricing -> Audit: Ghi giá cũ/mới và người sửa
+  Pricing -> Cache: Xóa cache menu liên quan
+  Cache --> Pricing: Đã làm mới
+  Pricing --> UI: Công bố menu thành công
+end
+@enduml

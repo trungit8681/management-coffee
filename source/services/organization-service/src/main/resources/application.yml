@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: organization-service
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  datasource:
+    url: ${ORGANIZATION_DB_URL:jdbc:postgresql://localhost:5434/organization}
+    username: ${ORGANIZATION_DB_USERNAME:organization_app}
+    password: ${ORGANIZATION_DB_PASSWORD:admin1234}
+    hikari.maximum-pool-size: ${ORGANIZATION_DB_POOL_SIZE:10}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-migration-naming: true
+  lifecycle.timeout-per-shutdown-phase: 20s
+server:
+  port: ${PORT:8081}
+  shutdown: graceful
+organization:
+  jwt:
+    issuer: ${ORGANIZATION_JWT_ISSUER:coffee-identity}
+    audience: ${ORGANIZATION_JWT_AUDIENCE:coffee-platform}
+    jwks-uri: ${ORGANIZATION_JWKS_URI:http://localhost:8080/.well-known/jwks.json}
+    jwks-cache-ttl: ${ORGANIZATION_JWKS_CACHE_TTL:PT5M}
+management:
+  endpoints.web.exposure.include: health,info,prometheus
+  endpoint.health.probes.enabled: true

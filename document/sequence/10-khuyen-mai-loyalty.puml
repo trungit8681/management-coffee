@@ -1,0 +1,63 @@
+@startuml
+title SEQUENCE 10 - KHUYẾN MÃI, VOUCHER VÀ KHÁCH HÀNG THÂN THIẾT
+autonumber
+hide footbox
+
+actor "Quản trị/Quản lý" as Manager
+actor "Khách hàng" as Customer
+boundary "Admin/POS/App" as UI
+control "Promotion Service" as Promo
+control "Loyalty Service" as Loyalty
+control "Order Service" as Order
+database "Promotion DB" as PromoDB
+database "Loyalty DB" as LoyaltyDB
+control "Notification Service" as Notify
+control "Audit Service" as Audit
+
+group Thiết lập và phát hành chương trình
+  Manager -> UI: Khai báo loại giảm, điều kiện,\nphạm vi, thời gian, giới hạn, cộng dồn
+  UI -> Promo: saveCampaign(rules)
+  Promo -> Promo: Kiểm tra xung đột và logic điều kiện
+  alt Quy tắc không hợp lệ
+    Promo --> UI: Danh sách lỗi/xung đột
+  else Hợp lệ
+    Promo -> PromoDB: Lưu campaign và phiên bản rule
+    Promo -> Audit: Ghi nhận người tạo/phê duyệt
+    opt Phát voucher cho nhóm khách
+      Promo -> PromoDB: Lưu voucher duy nhất/hạn dùng
+      Promo -> Notify: Gửi voucher cho khách
+    end
+    Promo --> UI: Chương trình đã công bố
+  end
+end
+
+group Dùng voucher/điểm khi thanh toán
+  Customer -> UI: Nhập voucher/chọn số điểm dùng
+  UI -> Promo: validate(voucher, customer, orderContext)
+  Promo -> PromoDB: Đọc rule, lượt dùng và lịch sử voucher
+  Promo -> Promo: Kiểm tra ngày, kênh, chi nhánh,\nsản phẩm, giá trị đơn, hạng, cộng dồn
+  alt Không đạt điều kiện
+    Promo --> UI: Mã lỗi và điều kiện chưa đạt
+  else Đạt điều kiện
+    Promo -> PromoDB: Giữ lượt voucher theo orderId
+    UI -> Loyalty: reservePoints(customer, points, orderId)
+    Loyalty -> LoyaltyDB: Khóa số dư và kiểm tra điểm sắp hết hạn
+    alt Không đủ điểm
+      Loyalty --> UI: Từ chối dùng điểm
+    else Đủ điểm
+      Loyalty -> LoyaltyDB: Giữ điểm
+      Promo --> UI: Tổng ưu đãi hợp lệ
+    end
+  end
+end
+
+group Sau khi đơn hoàn thành
+  Order -> Promo: commitVoucher(orderId)
+  Promo -> PromoDB: Tăng lượt sử dụng
+  Order -> Loyalty: commitRedeemAndEarn(order)
+  Loyalty -> LoyaltyDB: Trừ điểm đã giữ
+  Loyalty -> Loyalty: Tính điểm mới theo giá trị hợp lệ
+  Loyalty -> LoyaltyDB: Ghi sổ điểm và đánh giá lại hạng
+  Loyalty -> Notify: Thông báo điểm/hạng mới
+end
+@enduml

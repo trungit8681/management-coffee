@@ -1,0 +1,9 @@
+.m2/
+**/target/
+**/build/
+**/dist/
+**/node_modules/
+.env
+.env.*
+!.env.example
+

@@ -1,0 +1,60 @@
+@startuml
+title SEQUENCE 02 - QUẢN LÝ CHI NHÁNH, NHÂN SỰ VÀ LỊCH LÀM
+autonumber
+hide footbox
+
+actor "Quản trị/Quản lý" as Manager
+boundary "Trang quản trị" as AdminUI
+control "Organization Service\n(Branch module)" as Branch
+control "Organization Service\n(Employee module)" as HR
+control "Organization Service\n(Scheduling module)" as Schedule
+control "RBAC Service" as RBAC
+database "Organization PostgreSQL" as DB
+control "Notification Service" as Notify
+control "Audit Service" as Audit
+
+group Tạo hoặc cập nhật chi nhánh
+  Manager -> AdminUI: Nhập thông tin chi nhánh
+  AdminUI -> RBAC: Kiểm tra quyền manage_branch
+  RBAC --> AdminUI: Cho phép
+  AdminUI -> Branch: Lưu địa chỉ, giờ mở cửa,\nkhu vực giao hàng, trạng thái
+  Branch -> Branch: Kiểm tra dữ liệu và trùng mã
+  alt Dữ liệu không hợp lệ/trùng mã
+    Branch --> AdminUI: Lỗi kiểm tra dữ liệu
+  else Hợp lệ
+    Branch -> DB: INSERT/UPDATE branch
+    Branch -> Audit: Ghi lịch sử thay đổi
+    Branch --> AdminUI: Chi nhánh đã lưu
+  end
+end
+
+group Phân nhân viên vào chi nhánh
+  Manager -> AdminUI: Chọn nhân viên và chi nhánh
+  AdminUI -> RBAC: Kiểm tra quyền và branch scope
+  alt Ngoài phạm vi quản lý
+    RBAC --> AdminUI: Từ chối
+  else Trong phạm vi
+    RBAC --> AdminUI: Cho phép
+    AdminUI -> HR: assignEmployee(employee, branch, role)
+    HR -> DB: Kiểm tra trạng thái nhân viên/chi nhánh
+    HR -> DB: Lưu phân công và vai trò
+    HR -> Audit: Ghi nhận thay đổi phân công
+    HR --> AdminUI: Phân công thành công
+    HR -> Notify: Thông báo cho nhân viên
+  end
+end
+
+group Xếp lịch và xử lý xung đột
+  Manager -> AdminUI: Lập lịch tuần/tháng
+  AdminUI -> Schedule: createSchedule(branch, shifts)
+  Schedule -> DB: Đọc ca rảnh, nghỉ phép, lịch hiện có
+  Schedule -> Schedule: Kiểm tra trùng ca và giới hạn giờ
+  alt Có xung đột
+    Schedule --> AdminUI: Danh sách xung đột cần sửa
+  else Không xung đột
+    Schedule -> DB: Lưu lịch và phiên bản
+    Schedule -> Notify: Gửi lịch cho nhân viên
+    Schedule --> AdminUI: Công bố lịch thành công
+  end
+end
+@enduml

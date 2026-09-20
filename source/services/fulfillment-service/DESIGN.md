@@ -1,0 +1,3 @@
+# Fulfillment Service
+
+Owns delivery and delivery attempts. Creation verifies a confirmed delivery-channel order over REST. Assignment is version-checked; completion verifies the order is `PAID`, so cash-on-delivery cannot be marked delivered before collection. Failed and delivered attempts are appended and emitted to the local outbox. External courier assignment and tracking adapters are not yet implemented. Local standalone configuration and deployment are in `source/services/fulfillment-service/.env.example` and `compose.yml`; integrated configuration is in `source/.env.example` and `source/compose-business.yml`.

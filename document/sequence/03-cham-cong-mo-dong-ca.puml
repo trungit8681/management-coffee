@@ -1,0 +1,67 @@
+@startuml
+title SEQUENCE 03 - CHẤM CÔNG, MỞ CA VÀ ĐÓNG CA
+autonumber
+hide footbox
+
+actor "Nhân viên/Trưởng ca" as Staff
+boundary "POS/Thiết bị chấm công" as UI
+control "Organization Service\n(Attendance module)" as Attendance
+control "Organization Service\n(WorkShift module)" as Shift
+control "Order Service" as Order
+control "Payment Service" as Payment
+control "Inventory Service" as Inventory
+database "Organization PostgreSQL" as DB
+database "Organization PostgreSQL\n(audit table)" as Audit
+
+group Chấm công
+  Staff -> UI: PIN/QR/GPS check-in
+  UI -> Attendance: checkIn(employee, branch, time, evidence)
+  Attendance -> DB: Kiểm tra lịch làm và phân công
+  alt Không đúng chi nhánh/không có ca
+    Attendance --> UI: Yêu cầu xác nhận ngoại lệ
+  else Hợp lệ
+    Attendance -> Attendance: Tính đi muộn nếu có
+    Attendance -> DB: Lưu thời điểm và trạng thái
+    Attendance -> Audit: Ghi nhận check-in theo attendanceId, actor, branch
+    Attendance --> UI: Check-in thành công
+  end
+end
+
+group Mở ca bán hàng
+  Staff -> UI: Nhập tiền đầu ca
+  UI -> Shift: openShift(branch, register, openingCash)
+  Shift -> DB: Kiểm tra ca đang mở
+  alt Đã có ca mở trên quầy
+    Shift --> UI: Từ chối mở ca trùng
+  else Chưa có ca
+    Shift -> DB: Tạo ca, snapshot tiền đầu ca
+    Shift -> Audit: Ghi nhận mở ca
+    Shift --> UI: Mã ca và trạng thái OPEN
+  end
+end
+
+group Đóng ca và đối soát
+  Staff -> UI: Chọn đóng ca, nhập tiền thực tế
+  UI -> Shift: requestClose(shiftId, actualCash, notes)
+  par Tổng hợp bán hàng
+    Shift -> Order: Tổng đơn, đơn hủy/hoàn
+    Order --> Shift: orderSummary
+  else Tổng hợp thanh toán tiền mặt
+    Shift -> Payment: Tổng tiền mặt thu/hoàn trong ca
+    Payment --> Shift: cashPaymentSummary
+  else Tổng hợp kho
+    Shift -> Inventory: Hàng hỏng/điều chỉnh trong ca
+    Inventory --> Shift: inventorySummary
+  end
+  Shift -> Shift: expectedCash = opening + cashSales\n+ cashIn - cashOut - cashRefund
+  Shift -> Shift: variance = actualCash - expectedCash
+  alt Chênh lệch vượt ngưỡng
+    Shift --> UI: Yêu cầu giải trình/duyệt quản lý
+    Staff -> UI: Nhập giải trình
+    UI -> Shift: submitExplanation()
+  end
+  Shift -> DB: Lưu đối soát, bàn giao, đóng ca
+  Shift -> Audit: Ghi nhận số liệu đối soát, người duyệt\n(không chép nội dung giải trình)
+  Shift --> UI: Biên bản đóng ca
+end
+@enduml

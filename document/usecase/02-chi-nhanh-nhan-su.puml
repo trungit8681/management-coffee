@@ -1,0 +1,66 @@
+@startuml
+title USE CASE - CHI NHÁNH, NHÂN SỰ VÀ CA LÀM VIỆC
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam actorStyle awesome
+
+actor "Quản trị hệ thống" as Admin
+actor "Quản lý cửa hàng" as Manager
+actor "Trưởng ca" as Leader
+actor "Nhân viên" as Staff
+
+rectangle "Quản lý chi nhánh" {
+  usecase "Thêm / sửa chi nhánh" as ManageBranch
+  usecase "Cấu hình giờ hoạt động" as OpeningHours
+  usecase "Cấu hình khu vực giao hàng" as DeliveryArea
+  usecase "Cấu hình menu và giá\ntheo chi nhánh" as BranchMenu
+  usecase "Tạm đóng / mở nhận đơn" as BranchStatus
+}
+
+rectangle "Quản lý nhân sự và ca" {
+  usecase "Quản lý hồ sơ nhân viên" as EmployeeProfile
+  usecase "Phân nhân viên vào chi nhánh" as AssignBranch
+  usecase "Xếp lịch làm việc" as Schedule
+  usecase "Đăng ký ca rảnh" as Availability
+  usecase "Yêu cầu đổi ca" as SwapShift
+  usecase "Xin nghỉ phép" as LeaveRequest
+  usecase "Duyệt đổi ca / nghỉ phép" as ApproveRequest
+  usecase "Chấm công" as Attendance
+  usecase "Ghi nhận đi muộn / về sớm" as AttendanceIssue
+  usecase "Mở ca bán hàng" as OpenShift
+  usecase "Đóng ca bán hàng" as CloseShift
+  usecase "Đối soát tiền và đơn hàng" as Reconcile
+  usecase "Bàn giao ca" as Handover
+}
+
+Admin -- ManageBranch
+Admin -- AssignBranch
+Manager -- ManageBranch
+Manager -- OpeningHours
+Manager -- DeliveryArea
+Manager -- BranchMenu
+Manager -- BranchStatus
+Manager -- EmployeeProfile
+Manager -- AssignBranch
+Manager -- Schedule
+Manager -- ApproveRequest
+
+Staff -- Availability
+Staff -- SwapShift
+Staff -- LeaveRequest
+Staff -- Attendance
+
+Leader -- OpenShift
+Leader -- CloseShift
+Leader -- Handover
+Leader -- ApproveRequest
+
+AttendanceIssue ..> Attendance : <<extend>>
+CloseShift ..> Reconcile : <<include>>
+CloseShift ..> Handover : <<include>>
+ApproveRequest ..> SwapShift : <<extend>>
+ApproveRequest ..> LeaveRequest : <<extend>>
+@enduml
+

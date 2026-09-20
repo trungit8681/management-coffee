@@ -1,0 +1,52 @@
+@startuml
+title SEQUENCE 07 - PHA CHẾ, TRỪ KHO VÀ HOÀN THÀNH MÓN
+autonumber
+hide footbox
+
+actor "Barista" as Barista
+actor "Khách hàng/Thu ngân" as Receiver
+boundary "Màn hình pha chế" as KDS
+control "Kitchen Queue" as Queue
+control "Order Service" as Order
+control "Recipe Service" as Recipe
+control "Inventory Service" as Inventory
+control "Notification Service" as Notify
+database "Operations DB" as DB
+
+Order -> Queue: Publish OrderConfirmed(orderId, items)
+Queue -> KDS: Hiển thị món theo ưu tiên và thời gian chờ
+Barista -> KDS: Nhận món
+KDS -> Order: claimItem(itemId, employeeId)
+Order -> DB: Trạng thái item = PREPARING
+Order -> Recipe: getRecipe(productVariant, branch)
+Recipe --> KDS: Công thức, topping, ghi chú
+
+Barista -> KDS: Đánh dấu hoàn thành món
+KDS -> Order: completeItem(itemId)
+Order -> Inventory: deductByRecipe(itemId, recipeVersion)
+Inventory -> DB: Khóa các lô theo FEFO
+alt Không đủ tồn hệ thống
+  Inventory --> Order: DEDUCTION_FAILED
+  Order --> KDS: Cảnh báo trưởng ca xử lý tồn
+  note over Order,Inventory
+    Không làm mất trạng thái pha chế;
+    tạo ngoại lệ kho để đối soát.
+  end note
+else Trừ kho thành công
+  Inventory -> DB: Tạo bút toán xuất kho theo công thức
+  Inventory --> Order: DEDUCTED
+end
+Order -> DB: item = READY
+
+alt Tất cả món trong đơn đã READY
+  Order -> DB: order = READY
+  Order -> Notify: Gọi số/push/SMS cho khách
+  Notify --> Receiver: Đơn đã sẵn sàng
+else Còn món đang pha chế
+  Order --> KDS: Cập nhật tiến độ đơn
+end
+
+Receiver -> KDS: Xác nhận đã giao/nhận món
+KDS -> Order: handover(orderId)
+Order -> DB: order = DELIVERED/COMPLETED
+@enduml

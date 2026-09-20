@@ -1,0 +1,72 @@
+@startuml
+title USE CASE - SẢN PHẨM, MENU VÀ KHO NGUYÊN LIỆU
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam actorStyle awesome
+
+actor "Quản trị hệ thống" as Admin
+actor "Quản lý cửa hàng" as Manager
+actor "Nhân viên kho" as WarehouseStaff
+actor "Nhà cung cấp" as Supplier
+
+rectangle "Sản phẩm và menu" {
+  usecase "Quản lý danh mục" as Category
+  usecase "Quản lý sản phẩm" as Product
+  usecase "Quản lý kích thước\nvà tùy chọn món" as Variant
+  usecase "Quản lý topping" as Topping
+  usecase "Quản lý công thức" as Recipe
+  usecase "Thiết lập giá theo\nchi nhánh / kênh bán" as Pricing
+  usecase "Cập nhật trạng thái bán" as SellingStatus
+}
+
+rectangle "Kho và nhà cung cấp" {
+  usecase "Quản lý nguyên liệu" as Ingredient
+  usecase "Quản lý nhà cung cấp" as ManageSupplier
+  usecase "Nhập kho" as StockIn
+  usecase "Xuất kho" as StockOut
+  usecase "Kiểm kê kho" as Stocktake
+  usecase "Điều chỉnh tồn kho" as Adjustment
+  usecase "Theo dõi lô và hạn sử dụng" as Batch
+  usecase "Ghi nhận hỏng / thất thoát" as Waste
+  usecase "Cảnh báo tồn kho thấp" as LowStock
+  usecase "Lập đơn mua nguyên liệu" as PurchaseOrder
+  usecase "Chuyển kho giữa chi nhánh" as Transfer
+  usecase "Tự động trừ nguyên liệu" as AutoDeduct
+}
+
+Admin -- Category
+Admin -- Product
+Admin -- Pricing
+Manager -- Product
+Manager -- Recipe
+Manager -- Pricing
+Manager -- SellingStatus
+Manager -- Ingredient
+Manager -- ManageSupplier
+Manager -- Stocktake
+Manager -- Adjustment
+Manager -- PurchaseOrder
+Manager -- Transfer
+
+WarehouseStaff -- StockIn
+WarehouseStaff -- StockOut
+WarehouseStaff -- Stocktake
+WarehouseStaff -- Batch
+WarehouseStaff -- Waste
+WarehouseStaff -- Transfer
+
+Supplier -- PurchaseOrder
+
+Product ..> Category : <<include>>
+Product ..> Variant : <<include>>
+Product ..> Topping : <<include>>
+Recipe ..> Ingredient : <<include>>
+StockIn ..> Batch : <<include>>
+Adjustment ..> Stocktake : <<extend>>\n[có chênh lệch]
+PurchaseOrder ..> LowStock : <<extend>>\n[dưới định mức]
+AutoDeduct ..> Recipe : <<include>>
+AutoDeduct ..> StockOut : <<include>>
+@enduml
+

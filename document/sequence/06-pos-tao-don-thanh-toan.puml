@@ -1,0 +1,79 @@
+@startuml
+title SEQUENCE 06 - ỨNG DỤNG BÁN HÀNG TẠO ĐƠN VÀ THU TIỀN MẶT
+autonumber
+hide footbox
+
+actor "Thu ngân" as Cashier
+actor "Khách hàng" as Customer
+boundary "Ứng dụng bán hàng tại quầy" as POS
+control "Order Service" as Order
+control "Menu/Pricing Service" as Menu
+control "Promotion Service" as Promo
+control "Loyalty Service" as Loyalty
+control "Payment Service" as Payment
+control "Kitchen Queue" as Kitchen
+control "Invoice Service" as Invoice
+database "Order DB" as DB
+database "Payment DB" as PaymentDB
+
+Cashier -> POS: Chọn chi nhánh, loại đơn
+POS -> Order: createDraft(branch, type, table/pickupTime)
+Order -> DB: Tạo đơn DRAFT
+Order --> POS: orderId
+
+loop Mỗi món
+  Cashier -> POS: Chọn sản phẩm, size, topping, ghi chú
+  POS -> Menu: getSellableItem(branch, channel, item)
+  Menu -> Menu: Kiểm tra trạng thái bán và giá hiệu lực
+  alt Hết hàng/ngừng bán
+    Menu --> POS: Không thể thêm món
+  else Có thể bán
+    Menu --> POS: Giá, thuế, tùy chọn hợp lệ
+    POS -> Order: addItem(orderId, configuration, priceVersion)
+    Order -> DB: Lưu dòng hàng và snapshot giá
+    Order --> POS: Tạm tính mới
+  end
+end
+
+opt Khách dùng voucher/điểm
+  Customer -> Cashier: Cung cấp thành viên/voucher
+  Cashier -> POS: Nhập mã và số điểm muốn dùng
+  POS -> Promo: validate(order, customer, voucher)
+  Promo -> Promo: Kiểm tra thời gian, chi nhánh,\nkênh, sản phẩm, hạn mức, cộng dồn
+  alt Voucher không hợp lệ
+    Promo --> POS: Lý do từ chối
+  else Hợp lệ
+    Promo --> POS: discount + reservationId
+    POS -> Loyalty: reservePoints(customer, points, order)
+    Loyalty --> POS: Đã giữ điểm hoặc lỗi số dư
+  end
+end
+
+POS -> Order: calculateTotal(orderId)
+Order --> POS: subtotal, discount, tax, total
+Cashier -> POS: Nhập số tiền mặt khách đưa
+POS -> Payment: recordCashPayment(orderId, cashReceived)
+Payment -> Payment: Kiểm tra số tiền nhận >= tổng đơn
+alt Tiền nhận không đủ
+  Payment --> POS: Yêu cầu nhập đủ tiền mặt
+else Tiền nhận hợp lệ
+  Payment -> Payment: Tính tiền thừa
+  Payment -> PaymentDB: Lưu giao dịch tiền mặt + outbox trong 1 transaction
+  Payment --> POS: PAID + tiền thừa
+  Payment -> Order: confirmPaid(orderId)
+  Order -> Payment: Xác minh biên nhận tiền mặt theo orderId
+  Payment --> Order: paymentId, chi nhánh, tổng tiền, tiền nhận
+  Order -> Promo: Commit voucher usage
+  Order -> Loyalty: Commit điểm đã dùng
+  Order -> DB: Chuyển đơn CONFIRMED
+  Order -> Kitchen: Phát phiếu pha chế
+  Order -> Invoice: Phát hành/in hóa đơn
+  Invoice --> POS: Hóa đơn/QR tra cứu
+  POS --> Cashier: Hoàn tất đơn
+end
+
+note over POS,Payment
+  Phạm vi hiện tại chỉ nhận tiền mặt.
+  Chuyển khoản và máy POS thanh toán sẽ bổ sung sau.
+end note
+@enduml

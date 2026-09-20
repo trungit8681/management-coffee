@@ -1,0 +1,198 @@
+{
+    "schema_version":  1,
+    "diagram_type":  "sequence",
+    "meta":  {
+                 "title":  "Cache Miss Request · Xem chi nhánh",
+                 "quality_profile":  "showcase",
+                 "column_fit":  "spread",
+                 "viewBox":  [
+                                 1200,
+                                 740
+                             ]
+             },
+    "participants":  [
+                         {
+                             "id":  "manager",
+                             "type":  "external",
+                             "label":  "Quản trị / Quản lý"
+                         },
+                         {
+                             "id":  "web",
+                             "type":  "frontend",
+                             "label":  "Web UI"
+                         },
+                         {
+                             "id":  "kong",
+                             "type":  "cloud",
+                             "label":  "Kong"
+                         },
+                         {
+                             "id":  "org",
+                             "type":  "backend",
+                             "label":  "Organization"
+                         },
+                         {
+                             "id":  "keycache",
+                             "type":  "security",
+                             "label":  "JWKS cache"
+                         },
+                         {
+                             "id":  "identity",
+                             "type":  "security",
+                             "label":  "Identity"
+                         },
+                         {
+                             "id":  "db",
+                             "type":  "database",
+                             "label":  "Org PostgreSQL"
+                         }
+                     ],
+    "segments":  [
+                     {
+                         "from":  160,
+                         "to":  245,
+                         "label":  "Yêu cầu"
+                     },
+                     {
+                         "from":  255,
+                         "to":  465,
+                         "label":  "JWKS cache miss"
+                     },
+                     {
+                         "from":  475,
+                         "to":  650,
+                         "label":  "Ủy quyền và dữ liệu"
+                     }
+                 ],
+    "messages":  [
+                     {
+                         "id":  "open",
+                         "from":  "manager",
+                         "to":  "web",
+                         "y":  170,
+                         "label":  "Mở chi nhánh"
+                     },
+                     {
+                         "id":  "request",
+                         "from":  "web",
+                         "to":  "kong",
+                         "y":  200,
+                         "label":  "GET /api/v1/organization/branches/{id}",
+                         "variant":  "emphasis"
+                     },
+                     {
+                         "id":  "route",
+                         "from":  "kong",
+                         "to":  "org",
+                         "y":  230,
+                         "label":  "Chuyển tiếp Bearer JWT",
+                         "variant":  "dashed"
+                     },
+                     {
+                         "id":  "lookup",
+                         "from":  "org",
+                         "to":  "keycache",
+                         "y":  275,
+                         "label":  "Tra public key theo kid",
+                         "variant":  "security"
+                     },
+                     {
+                         "id":  "miss",
+                         "from":  "keycache",
+                         "to":  "org",
+                         "y":  305,
+                         "label":  "Hết TTL / kid chưa có",
+                         "variant":  "return"
+                     },
+                     {
+                         "id":  "fetch",
+                         "from":  "org",
+                         "to":  "identity",
+                         "y":  345,
+                         "label":  "GET /.well-known/jwks.json",
+                         "variant":  "security"
+                     },
+                     {
+                         "id":  "jwks",
+                         "from":  "identity",
+                         "to":  "org",
+                         "y":  380,
+                         "label":  "Public JWK",
+                         "variant":  "return"
+                     },
+                     {
+                         "id":  "store",
+                         "from":  "org",
+                         "to":  "keycache",
+                         "y":  415,
+                         "label":  "Lưu key với TTL",
+                         "variant":  "dashed"
+                     },
+                     {
+                         "id":  "query",
+                         "from":  "org",
+                         "to":  "db",
+                         "y":  510,
+                         "label":  "Sau kiểm tra JWT + scope: đọc chi nhánh",
+                         "variant":  "emphasis"
+                     },
+                     {
+                         "id":  "rows",
+                         "from":  "db",
+                         "to":  "org",
+                         "y":  545,
+                         "label":  "Dữ liệu chi nhánh",
+                         "variant":  "return"
+                     },
+                     {
+                         "id":  "response",
+                         "from":  "org",
+                         "to":  "kong",
+                         "y":  590,
+                         "label":  "200 JSON",
+                         "variant":  "return"
+                     },
+                     {
+                         "id":  "proxyreturn",
+                         "from":  "kong",
+                         "to":  "web",
+                         "y":  610,
+                         "label":  "200 JSON",
+                         "variant":  "return"
+                     },
+                     {
+                         "id":  "render",
+                         "from":  "web",
+                         "to":  "manager",
+                         "y":  645,
+                         "label":  "Hiển thị chi nhánh",
+                         "variant":  "return"
+                     }
+                 ],
+    "cards":  [
+                  {
+                      "dot":  "amber",
+                      "title":  "Điều kiện cache miss",
+                      "items":  [
+                                    "JWKS cache nằm trong bộ nhớ Organization, TTL mặc định 5 phút.",
+                                    "Khi kid vắng mặt, service buộc tải lại JWKS; không dùng Redis cho luồng này."
+                                ]
+                  },
+                  {
+                      "dot":  "rose",
+                      "title":  "Bảo mật và lỗi",
+                      "items":  [
+                                    "Chữ ký RS256, issuer, audience, hạn token và branch scope được kiểm tra tại Organization.",
+                                    "JWKS lỗi hoặc token sai: từ chối yêu cầu; thiếu quyền/scope: không đọc dữ liệu chi nhánh."
+                                ]
+                  },
+                  {
+                      "dot":  "cyan",
+                      "title":  "Trạng thái Kong",
+                      "items":  [
+                                    "Đường qua Kong là hợp đồng kiến trúc trong BangKeHoach.md.",
+                                    "Compose hiện chạy Identity/Organization riêng và chưa có route Kong cho hai service."
+                                ]
+                  }
+              ]
+}

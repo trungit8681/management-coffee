@@ -1,0 +1,78 @@
+@startuml
+title USE CASE - BÁN HÀNG, ĐƠN HÀNG VÀ PHA CHẾ
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam actorStyle awesome
+
+actor "Thu ngân" as Cashier
+actor "Pha chế" as Barista
+actor "Trưởng ca" as Leader
+actor "Khách hàng" as Customer
+actor "Đơn vị giao hàng" as DeliveryPartner
+
+rectangle "Ứng dụng bán hàng và quản lý đơn hàng" {
+  usecase "Tạo đơn hàng" as CreateOrder
+  usecase "Chọn loại đơn" as OrderType
+  usecase "Thêm sản phẩm vào đơn" as AddItem
+  usecase "Tùy chỉnh món và topping" as Customize
+  usecase "Ghi chú pha chế" as Note
+  usecase "Áp dụng voucher / điểm" as ApplyBenefit
+  usecase "Tính tổng tiền" as Calculate
+  usecase "Thu tiền mặt" as Payment
+  usecase "In / xuất hóa đơn" as Invoice
+  usecase "Tách / gộp hóa đơn" as SplitMerge
+  usecase "Hủy món / hủy đơn" as Cancel
+  usecase "Hoàn tiền mặt" as Refund
+  usecase "Gửi đơn tới quầy pha chế" as SendToBar
+  usecase "Tiếp nhận món cần pha chế" as ReceiveItem
+  usecase "Xem công thức và ghi chú" as ViewRecipe
+  usecase "Cập nhật trạng thái món" as UpdateItemStatus
+  usecase "Thông báo món sẵn sàng" as NotifyReady
+  usecase "Theo dõi trạng thái đơn" as TrackOrder
+  usecase "Bàn giao đơn giao hàng" as Dispatch
+}
+
+Cashier -- CreateOrder
+Cashier -- SplitMerge
+Cashier -- Cancel
+Cashier -- Payment
+
+Barista -- ReceiveItem
+Barista -- ViewRecipe
+Barista -- UpdateItemStatus
+
+Leader -- Cancel
+Leader -- Refund
+
+Customer -- Payment
+Customer -- TrackOrder
+DeliveryPartner -- Dispatch
+
+CreateOrder ..> OrderType : <<include>>
+CreateOrder ..> AddItem : <<include>>
+Customize ..> AddItem : <<extend>>
+Note ..> AddItem : <<extend>>
+CreateOrder ..> Calculate : <<include>>
+ApplyBenefit ..> Calculate : <<extend>>
+Payment ..> Calculate : <<include>>
+Payment ..> Invoice : <<include>>
+CreateOrder ..> SendToBar : <<include>>
+SendToBar ..> ReceiveItem : <<include>>
+ReceiveItem ..> ViewRecipe : <<include>>
+UpdateItemStatus ..> NotifyReady : <<extend>>\n[đã hoàn thành]
+Refund ..> Cancel : <<extend>>\n[đã thanh toán]
+Dispatch ..> UpdateItemStatus : <<extend>>\n[đơn giao hàng]
+
+note bottom of OrderType
+  Ăn tại quán, mang đi,
+  giao tận nơi hoặc đặt trước.
+end note
+
+note bottom of Payment
+  Hiện tại chỉ thu tiền mặt tại quầy
+  hoặc khi khách nhận món. Chuyển khoản
+  và máy POS là phạm vi nâng cấp sau.
+end note
+@enduml

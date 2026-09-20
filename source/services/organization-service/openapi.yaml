@@ -1,0 +1,46 @@
+openapi: 3.1.0
+info: {title: Coffee Organization Service API, version: 0.1.0}
+servers: [{url: /api/v1/organization}]
+security: [{bearerAuth: []}]
+paths:
+  /branches:
+    get: {operationId: listBranches, responses: {'200': {description: Branches visible in actor scope}}}
+    post:
+      operationId: createBranch
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/BranchWrite'}}}}
+      responses: {'201': {description: Created}, '403': {$ref: '#/components/responses/Forbidden'}, '409': {$ref: '#/components/responses/Conflict'}, '422': {$ref: '#/components/responses/Invalid'}}
+  /branches/{id}:
+    parameters: [{$ref: '#/components/parameters/Id'}]
+    get: {operationId: getBranch, responses: {'200': {description: Branch}, '403': {$ref: '#/components/responses/Forbidden'}, '404': {description: Not found}}}
+    put:
+      operationId: updateBranch
+      parameters: [{$ref: '#/components/parameters/IfMatch'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/BranchWrite'}}}}
+      responses: {'204': {description: Updated}, '409': {$ref: '#/components/responses/Conflict'}}
+  /employees:
+    post: {operationId: createEmployee, parameters: [{$ref: '#/components/parameters/IdempotencyKey'}], requestBody: {required: true, content: {application/json: {schema: {type: object}}}}, responses: {'201': {description: Created}}}
+  /employees/{id}/assignments:
+    post: {operationId: assignEmployee, parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/IdempotencyKey'}], requestBody: {required: true, content: {application/json: {schema: {type: object}}}}, responses: {'201': {description: Assigned}, '409': {$ref: '#/components/responses/Conflict'}}}
+  /schedules:
+    post: {operationId: publishSchedule, parameters: [{$ref: '#/components/parameters/IdempotencyKey'}], requestBody: {required: true, content: {application/json: {schema: {type: object}}}}, responses: {'201': {description: Published}, '409': {$ref: '#/components/responses/Conflict'}}}
+  /attendance/check-ins:
+    post: {operationId: checkIn, parameters: [{$ref: '#/components/parameters/IdempotencyKey'}], requestBody: {required: true, content: {application/json: {schema: {type: object}}}}, responses: {'201': {description: Checked in}, '422': {$ref: '#/components/responses/Invalid'}}}
+  /attendance/{id}/check-out:
+    post: {operationId: checkOut, parameters: [{$ref: '#/components/parameters/Id'}], requestBody: {required: true, content: {application/json: {schema: {type: object}}}}, responses: {'204': {description: Checked out}}}
+  /work-shifts:
+    post: {operationId: openShift, parameters: [{$ref: '#/components/parameters/IdempotencyKey'}], requestBody: {required: true, content: {application/json: {schema: {type: object}}}}, responses: {'201': {description: Opened}, '409': {$ref: '#/components/responses/Conflict'}}}
+  /work-shifts/{id}/close:
+    post: {operationId: closeShift, parameters: [{$ref: '#/components/parameters/Id'}, {$ref: '#/components/parameters/IfMatch'}], requestBody: {required: true, content: {application/json: {schema: {type: object}}}}, responses: {'200': {description: Reconciliation}, '409': {$ref: '#/components/responses/Conflict'}, '422': {$ref: '#/components/responses/Invalid'}}}
+components:
+  securitySchemes: {bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}}
+  parameters:
+    Id: {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    IdempotencyKey: {name: Idempotency-Key, in: header, required: true, schema: {type: string, maxLength: 200}}
+    IfMatch: {name: If-Match, in: header, required: true, schema: {type: integer, format: int64, minimum: 0}}
+  schemas:
+    BranchWrite: {type: object, required: [code,name,address,timezone,opensAt,closesAt], properties: {code: {type: string}, name: {type: string}, address: {type: string}, timezone: {type: string}, opensAt: {type: string, format: time}, closesAt: {type: string, format: time}, status: {type: string, enum: [OPEN,TEMPORARILY_CLOSED,INACTIVE]}}}
+  responses:
+    Forbidden: {description: Permission or branch scope denied}
+    Conflict: {description: Duplicate, overlap, idempotency or optimistic-lock conflict}
+    Invalid: {description: Domain validation failed}

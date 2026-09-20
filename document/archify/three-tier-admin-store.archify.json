@@ -1,0 +1,193 @@
+{
+    "schema_version":  1,
+    "diagram_type":  "architecture",
+    "meta":  {
+                 "title":  "Three-tier Web App · Quản trị và quản lý cửa hàng",
+                 "quality_profile":  "showcase",
+                 "viewBox":  [
+                                 1200,
+                                 700
+                             ]
+             },
+    "components":  [
+                       {
+                           "id":  "people",
+                           "type":  "external",
+                           "label":  "Quản trị · Quản lý",
+                           "pos":  [
+                                       30,
+                                       280
+                                   ],
+                           "size":  [
+                                        160,
+                                        70
+                                    ]
+                       },
+                       {
+                           "id":  "web",
+                           "type":  "frontend",
+                           "label":  "Trang quản trị",
+                           "sublabel":  "Web UI theo use case",
+                           "pos":  [
+                                       230,
+                                       280
+                                   ],
+                           "size":  [
+                                        170,
+                                        70
+                                    ]
+                       },
+                       {
+                           "id":  "kong",
+                           "type":  "cloud",
+                           "label":  "Kong",
+                           "sublabel":  "API gateway · thiết kế",
+                           "pos":  [
+                                       450,
+                                       280
+                                   ],
+                           "size":  [
+                                        150,
+                                        70
+                                    ]
+                       },
+                       {
+                           "id":  "identity",
+                           "type":  "security",
+                           "label":  "Identity Service",
+                           "sublabel":  "Đăng nhập · RBAC",
+                           "pos":  [
+                                       670,
+                                       120
+                                   ],
+                           "size":  [
+                                        190,
+                                        75
+                                    ]
+                       },
+                       {
+                           "id":  "organization",
+                           "type":  "backend",
+                           "label":  "Organization Service",
+                           "sublabel":  "Chi nhánh · nhân sự · ca",
+                           "pos":  [
+                                       670,
+                                       360
+                                   ],
+                           "size":  [
+                                        190,
+                                        75
+                                    ]
+                       },
+                       {
+                           "id":  "identitydb",
+                           "type":  "database",
+                           "label":  "Identity PostgreSQL",
+                           "pos":  [
+                                       960,
+                                       120
+                                   ],
+                           "size":  [
+                                        190,
+                                        68
+                                    ]
+                       },
+                       {
+                           "id":  "orgdb",
+                           "type":  "database",
+                           "label":  "Organization PostgreSQL",
+                           "pos":  [
+                                       960,
+                                       360
+                                   ],
+                           "size":  [
+                                        190,
+                                        68
+                                    ]
+                       },
+                       {
+                           "id":  "redis",
+                           "type":  "database",
+                           "label":  "Identity Redis",
+                           "sublabel":  "Khóa refresh token",
+                           "pos":  [
+                                       960,
+                                       245
+                                   ],
+                           "size":  [
+                                        190,
+                                        68
+                                    ]
+                       }
+                   ],
+    "connections":  [
+                        {
+                            "from":  "people",
+                            "to":  "web",
+                            "variant":  "emphasis"
+                        },
+                        {
+                            "from":  "web",
+                            "to":  "kong",
+                            "label":  "REST/JSON",
+                            "variant":  "emphasis"
+                        },
+                        {
+                            "from":  "kong",
+                            "to":  "identity",
+                            "label":  "API định danh",
+                            "variant":  "dashed",
+                            "fromSide":  "top",
+                            "toSide":  "left"
+                        },
+                        {
+                            "from":  "kong",
+                            "to":  "organization",
+                            "label":  "API tổ chức",
+                            "variant":  "dashed",
+                            "fromSide":  "bottom",
+                            "toSide":  "left"
+                        },
+                        {
+                            "from":  "identity",
+                            "to":  "identitydb",
+                            "label":  "tài khoản · phiên"
+                        },
+                        {
+                            "from":  "organization",
+                            "to":  "orgdb",
+                            "label":  "chi nhánh · ca"
+                        },
+                        {
+                            "from":  "identity",
+                            "to":  "redis",
+                            "variant":  "dashed"
+                        }
+                    ],
+    "cards":  [
+                  {
+                      "dot":  "cyan",
+                      "title":  "Tầng giao diện và API",
+                      "items":  [
+                                    "Web UI được mô tả trong use case, chưa có mã frontend trong repository.",
+                                    "Kong là đường vào theo BangKeHoach.md; Compose hiện chưa định tuyến Identity/Organization qua Kong."
+                                ]
+                  },
+                  {
+                      "dot":  "emerald",
+                      "title":  "Tầng nghiệp vụ",
+                      "items":  [
+                                    "Identity cấp JWT, vai trò, quyền và branch scope.",
+                                    "Organization kiểm tra JWT và quyền theo hành động/chi nhánh trước khi đọc hoặc ghi."
+                                ]
+                  },
+                  {
+                      "dot":  "violet",
+                      "title":  "Tầng dữ liệu",
+                      "items":  [
+                                    "Hai service sở hữu PostgreSQL riêng; không đọc chéo database.",
+                                    "Redis của Identity dùng khóa đồng bộ refresh token. JWKS được Organization cache trong bộ nhớ."
+                                ]
+                  }
+              ]
+}

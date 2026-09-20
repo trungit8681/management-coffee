@@ -1,0 +1,37 @@
+name: coffee-loyalty
+services:
+  loyalty-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: loyalty
+      POSTGRES_USER: loyalty_app
+      POSTGRES_PASSWORD: ${LOYALTY_DB_PASSWORD:?Set LOYALTY_DB_PASSWORD in .env}
+    ports: ["${LOYALTY_DB_PORT:-5442}:5432"]
+    volumes: [loyalty_db_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loyalty_app -d loyalty"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+  loyalty-service:
+    build: {context: ., dockerfile: Dockerfile}
+    environment:
+      LOYALTY_DB_URL: jdbc:postgresql://loyalty-db:5432/loyalty
+      LOYALTY_DB_USERNAME: loyalty_app
+      LOYALTY_DB_PASSWORD: ${LOYALTY_DB_PASSWORD:?Set LOYALTY_DB_PASSWORD in .env}
+      LOYALTY_JWKS_URI: ${LOYALTY_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
+      PORT: 8080
+    ports: ["${LOYALTY_SERVICE_PORT:-8087}:8080"]
+    depends_on:
+      loyalty-db: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+volumes:
+  loyalty_db_data: {name: coffee_loyalty_standalone_db_data}

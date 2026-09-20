@@ -1,0 +1,3 @@
+# Catalog Service
+
+Owns product, variant and branch/channel price history. SKU is unique. One active price exists per variant/branch/channel; publication serializes that scope, increments its version and writes `PricePublished.v1` in the same PostgreSQL transaction. A sellable lookup requires an active product, variant and price. `catalog:manage_product` is global; price write and menu read enforce JWT branch scope. The order service reads this API and snapshots the returned price/version; it never reads catalog tables. Local standalone configuration and deployment are in `source/services/catalog-service/.env.example` and `compose.yml`; integrated configuration is in `source/.env.example` and `source/compose-business.yml`.

@@ -1,0 +1,3 @@
+# Inventory Service
+
+Owns ingredient, branch balance and append-only stock ledger. Each receipt or deduction has a unique reference, a mandatory idempotency key, branch authorization, an atomic balance update and an outbox row in one PostgreSQL transaction. Deduction uses `UPDATE ... WHERE quantity >= requested` so concurrent requests cannot make stock negative. This slice does not yet validate a purchase order or deduct from a recipe. Local standalone configuration and deployment are in `source/services/inventory-service/.env.example` and `compose.yml`; integrated configuration is in `source/.env.example` and `source/compose-business.yml`.

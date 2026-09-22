@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: promotion
       POSTGRES_USER: promotion_app
-      POSTGRES_PASSWORD: ${PROMOTION_DB_PASSWORD:?Set PROMOTION_DB_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${PROMOTION_DB_PASSWORD:-admin1234}
     ports: ["${PROMOTION_DB_PORT:-5443}:5432"]
     volumes: [promotion_db_data:/var/lib/postgresql/data]
     healthcheck:

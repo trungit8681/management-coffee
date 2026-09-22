@@ -1,13 +1,22 @@
 import Fastify from 'fastify';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { createHash, randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { Pool, type PoolClient } from 'pg';
 
-const name = process.env.SERVICE_NAME || 'promotion';
+const localEnv = fileURLToPath(new URL('../.env', import.meta.url));
+if (existsSync(localEnv)) process.loadEnvFile(localEnv);
+const name = process.env.SERVICE_NAME || 'notification';
 const prefix = name.toUpperCase();
-export const pool = new Pool({ connectionString: process.env[`${prefix}_DB_URL`], max: 10 });
+const dbUrl = process.env[`${prefix}_DB_URL`] || (() => {
+  const password = process.env[`${prefix}_DB_PASSWORD`];
+  if (!password) return undefined;
+  const port = process.env[`${prefix}_DB_PORT`] || '5432';
+  return `postgresql://${name}_app:${encodeURIComponent(password)}@127.0.0.1:${port}/${name}`;
+})();
+export const pool = new Pool({ connectionString: dbUrl, max: 10 });
 export const app = Fastify({ logger: true });
 const issuer = process.env[`${prefix}_JWT_ISSUER`] || 'coffee-identity';
 const audience = process.env[`${prefix}_JWT_AUDIENCE`] || 'coffee-platform';
@@ -84,5 +93,6 @@ app.setErrorHandler((error, _request, reply) => {
 app.get('/health/live', async () => ({ status: 'UP' }));
 app.get('/health/ready', async () => { await pool.query('SELECT 1'); return { status: 'UP' }; });
 export async function start() {
+  if (!dbUrl) throw new Error(`${prefix}_DB_URL or ${prefix}_DB_PASSWORD is required`);
   await migrate(); await app.listen({ host: '0.0.0.0', port: Number(process.env.PORT || process.env[`${prefix}_SERVICE_PORT`] || 8080) });
 }

@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: loyalty
       POSTGRES_USER: loyalty_app
-      POSTGRES_PASSWORD: ${LOYALTY_DB_PASSWORD:?Set LOYALTY_DB_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${LOYALTY_DB_PASSWORD:-admin1234}
     ports: ["${LOYALTY_DB_PORT:-5442}:5432"]
     volumes: [loyalty_db_data:/var/lib/postgresql/data]
     healthcheck:

@@ -4,7 +4,7 @@ spring:
   datasource:
     url: ${PROCUREMENT_DB_URL:jdbc:postgresql://localhost:5441/procurement}
     username: ${PROCUREMENT_DB_USERNAME:procurement_app}
-    password: ${PROCUREMENT_DB_PASSWORD:-admin1234}
+    password: ${PROCUREMENT_DB_PASSWORD:admin1234}
   flyway: {enabled: true, locations: classpath:db/migration}
 server: {port: "${PORT:${PROCUREMENT_SERVICE_PORT:8084}}", shutdown: graceful}
 procurement:

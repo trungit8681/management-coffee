@@ -87,4 +87,3 @@ public class JwtVerifier {
     private record CachedKeys(Map<String, RSAKey> keys, Instant expiresAt) {
     }
 }
-

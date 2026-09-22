@@ -12,30 +12,42 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class HttpPaymentClient implements PaymentPort {
-    private final HttpClient http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
     private final ObjectMapper mapper;
     private final URI base;
-    public HttpPaymentClient(ObjectMapper mapper,@Value("${order.payment-base-url}") String base) {
-        this.mapper=mapper; this.base=URI.create(base.endsWith("/") ? base : base+"/");
+
+    public HttpPaymentClient(ObjectMapper mapper, @Value("${order.payment-base-url}") String base) {
+        this.mapper = mapper;
+        this.base = URI.create(base.endsWith("/") ? base : base + "/");
     }
-    public Receipt receipt(UUID orderId,String bearer) {
+
+    public Receipt receipt(UUID orderId, String bearer) {
         try {
-            var request=HttpRequest.newBuilder(base.resolve("api/v1/payments/cash/by-order/"+orderId))
-                    .timeout(Duration.ofSeconds(4)).header("Authorization",bearer).GET().build();
-            var response=http.send(request,HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode()!=200) throw new OrderException(503,"PAYMENT_UNAVAILABLE","Cannot verify cash receipt");
-            return mapper.readValue(response.body(),Receipt.class);
-        } catch (OrderException ex) { throw ex; }
-        catch (Exception ex) { throw new OrderException(503,"PAYMENT_UNAVAILABLE","Cannot verify cash receipt"); }
+            var request = HttpRequest.newBuilder(base.resolve("api/v1/payments/cash/by-order/" + orderId))
+                    .timeout(Duration.ofSeconds(4)).header("Authorization", bearer).GET().build();
+            var response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200)
+                throw new OrderException(503, "PAYMENT_UNAVAILABLE", "Cannot verify cash receipt");
+            return mapper.readValue(response.body(), Receipt.class);
+        } catch (OrderException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new OrderException(503, "PAYMENT_UNAVAILABLE", "Cannot verify cash receipt");
+        }
     }
-    public Refund refund(UUID orderId,String bearer) {
+
+    public Refund refund(UUID orderId, String bearer) {
         try {
-            var request=HttpRequest.newBuilder(base.resolve("api/v1/payments/cash/refunds/by-order/"+orderId))
-                    .timeout(Duration.ofSeconds(4)).header("Authorization",bearer).GET().build();
-            var response=http.send(request,HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode()!=200) throw new OrderException(503,"PAYMENT_UNAVAILABLE","Cannot verify cash refund");
-            return mapper.readValue(response.body(),Refund.class);
-        } catch (OrderException ex) { throw ex; }
-        catch (Exception ex) { throw new OrderException(503,"PAYMENT_UNAVAILABLE","Cannot verify cash refund"); }
+            var request = HttpRequest.newBuilder(base.resolve("api/v1/payments/cash/refunds/by-order/" + orderId))
+                    .timeout(Duration.ofSeconds(4)).header("Authorization", bearer).GET().build();
+            var response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200)
+                throw new OrderException(503, "PAYMENT_UNAVAILABLE", "Cannot verify cash refund");
+            return mapper.readValue(response.body(), Refund.class);
+        } catch (OrderException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new OrderException(503, "PAYMENT_UNAVAILABLE", "Cannot verify cash refund");
+        }
     }
 }

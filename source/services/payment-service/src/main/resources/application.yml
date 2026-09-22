@@ -4,7 +4,7 @@ spring:
   datasource:
     url: ${PAYMENT_DB_URL:jdbc:postgresql://localhost:5439/payment}
     username: ${PAYMENT_DB_USERNAME:payment_app}
-    password: ${PAYMENT_DB_PASSWORD:-admin1234}
+    password: ${PAYMENT_DB_PASSWORD:admin1234}
   flyway:
     enabled: true
     locations: classpath:db/migration

@@ -1,0 +1,25 @@
+name: coffee-gateway
+
+services:
+  kong:
+    image: kong:3.9.1
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/standalone.yml
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_ADMIN_LISTEN: "off"
+      KONG_STATUS_LISTEN: 0.0.0.0:8100
+    volumes:
+      - ./standalone.yml:/kong/standalone.yml:ro
+    ports:
+      - "${BUSINESS_GATEWAY_PORT:-8000}:8000"
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+

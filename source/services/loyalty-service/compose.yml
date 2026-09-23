@@ -21,7 +21,7 @@ services:
       LOYALTY_DB_URL: jdbc:postgresql://loyalty-db:5432/loyalty
       LOYALTY_DB_USERNAME: loyalty_app
       LOYALTY_DB_PASSWORD: ${LOYALTY_DB_PASSWORD:?Set LOYALTY_DB_PASSWORD in .env}
-      LOYALTY_JWKS_URI: ${LOYALTY_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
+      LOYALTY_JWKS_URI: ${LOYALTY_DOCKER_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
       PORT: 8080
     ports: ["${LOYALTY_SERVICE_PORT:-8087}:8080"]
     depends_on:

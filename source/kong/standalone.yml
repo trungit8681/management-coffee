@@ -1,0 +1,136 @@
+_format_version: "3.0"
+_transform: true
+
+plugins:
+  - name: correlation-id
+    config:
+      header_name: X-Correlation-ID
+      generator: uuid
+      echo_downstream: true
+  - name: request-size-limiting
+    config:
+      allowed_payload_size: 1
+
+services:
+  - name: identity-auth
+    url: http://host.docker.internal:8080
+    retries: 0
+    connect_timeout: 3000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes:
+      - name: identity-auth-api
+        paths: ["/api/v1/auth"]
+        strip_path: false
+    plugins:
+      - name: rate-limiting
+        config: {minute: 30, policy: local}
+
+  - name: identity
+    url: http://host.docker.internal:8080
+    retries: 0
+    connect_timeout: 3000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes:
+      - name: identity-api
+        paths: ["/api/v1/identity"]
+        strip_path: false
+    plugins:
+      - name: rate-limiting
+        config: {minute: 120, policy: local}
+
+  - name: organization
+    url: http://host.docker.internal:8081
+    retries: 0
+    connect_timeout: 3000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes:
+      - name: organization-api
+        paths: ["/api/v1/organization"]
+        strip_path: false
+    plugins:
+      - name: rate-limiting
+        config: {minute: 120, policy: local}
+
+  - name: catalog
+    url: http://host.docker.internal:8082
+    retries: 0
+    connect_timeout: 3000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes: [{name: catalog-api, paths: ["/api/v1/catalog"], strip_path: false}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+
+  - name: inventory
+    url: http://host.docker.internal:8083
+    retries: 0
+    connect_timeout: 3000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes: [{name: inventory-api, paths: ["/api/v1/inventory"], strip_path: false}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+
+  - name: procurement
+    url: http://host.docker.internal:8084
+    retries: 0
+    connect_timeout: 3000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes: [{name: procurement-api, paths: ["/api/v1/procurement"], strip_path: false}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+
+  - name: payments
+    url: http://host.docker.internal:8085
+    retries: 0
+    connect_timeout: 3000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes: [{name: payment-api, paths: ["/api/v1/payments"], strip_path: false}]
+    plugins: [{name: rate-limiting, config: {minute: 60, policy: local}}]
+
+  - name: orders
+    url: http://host.docker.internal:8086
+    retries: 0
+    connect_timeout: 3000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes: [{name: order-api, paths: ["/api/v1/orders"], strip_path: false}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+
+  - name: loyalty
+    url: http://host.docker.internal:8087
+    retries: 0
+    connect_timeout: 3000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes: [{name: loyalty-api, paths: ["/api/v1/loyalty"], strip_path: false}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+
+  - name: promotion
+    url: http://host.docker.internal:8088
+    retries: 0
+    connect_timeout: 3000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes: [{name: promotion-api, paths: ["/api/v1/promotions"], strip_path: false}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+
+  - name: notification
+    url: http://host.docker.internal:8089
+    retries: 0
+    connect_timeout: 3000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes: [{name: notification-api, paths: ["/api/v1/notifications"], strip_path: false}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+
+  - name: fulfillment
+    url: http://host.docker.internal:8090
+    retries: 0
+    connect_timeout: 3000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes: [{name: fulfillment-api, paths: ["/api/v1/fulfillment"], strip_path: false}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]

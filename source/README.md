@@ -28,6 +28,14 @@ docker compose --env-file source/services/catalog-service/.env -f source/service
 
 Repeat with the desired service name. Default HTTP ports are Identity 8080, Organization 8081, Catalog 8082, Inventory 8083, Procurement 8084, Payment 8085, Order 8086, Loyalty 8087, Promotion 8088, Notification 8089, and Fulfillment 8090. Each `.env.example` also lists its configurable PostgreSQL host port. Order, Payment, and Fulfillment use the published HTTP ports for cross-service calls, so start their dependencies first and update the corresponding `*_BASE_URL` values when ports differ. Identity's JWKS URL must be reachable from the containers. Standalone host ports support local development; route public traffic through Kong in a deployment.
 
+After the standalone service stacks are healthy, start the standalone Kong gateway without creating duplicate service or database containers:
+
+```powershell
+docker compose -f source/kong/compose.yml up -d
+```
+
+Kong listens at `http://localhost:8000` by default and forwards `/api/v1/*` routes to the published service ports 8080-8090. Override `BUSINESS_GATEWAY_PORT` when port 8000 is unavailable.
+
 ## Local run: integrated stack
 
 1. Start `identity-service` using its own `compose.yml`. Configure a local bootstrap administrator and apply Flyway V4–V6.

@@ -20,7 +20,7 @@ services:
     environment:
       SERVICE_NAME: notification
       NOTIFICATION_DB_URL: "postgresql://notification_app:${NOTIFICATION_DB_PASSWORD:?Set NOTIFICATION_DB_PASSWORD in .env}@notification-db:5432/notification"
-      NOTIFICATION_JWKS_URI: ${NOTIFICATION_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
+      NOTIFICATION_JWKS_URI: ${NOTIFICATION_DOCKER_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
       PORT: 8080
     ports: ["${NOTIFICATION_SERVICE_PORT:-8089}:8080"]
     depends_on:

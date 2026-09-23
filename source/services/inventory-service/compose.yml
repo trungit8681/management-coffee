@@ -21,7 +21,7 @@ services:
       INVENTORY_DB_URL: jdbc:postgresql://inventory-db:5432/inventory
       INVENTORY_DB_USERNAME: inventory_app
       INVENTORY_DB_PASSWORD: ${INVENTORY_DB_PASSWORD:-admin1234}
-      INVENTORY_JWKS_URI: ${INVENTORY_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
+      INVENTORY_JWKS_URI: ${INVENTORY_DOCKER_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
       PORT: 8080
     ports: ["${INVENTORY_SERVICE_PORT:-8083}:8080"]
     depends_on:

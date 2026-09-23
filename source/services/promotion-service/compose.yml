@@ -20,7 +20,7 @@ services:
     environment:
       SERVICE_NAME: promotion
       PROMOTION_DB_URL: "postgresql://promotion_app:${PROMOTION_DB_PASSWORD:?Set PROMOTION_DB_PASSWORD in .env}@promotion-db:5432/promotion"
-      PROMOTION_JWKS_URI: ${PROMOTION_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
+      PROMOTION_JWKS_URI: ${PROMOTION_DOCKER_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
       PORT: 8080
     ports: ["${PROMOTION_SERVICE_PORT:-8088}:8080"]
     depends_on:

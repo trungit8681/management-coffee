@@ -20,8 +20,8 @@ services:
     environment:
       SERVICE_NAME: fulfillment
       FULFILLMENT_DB_URL: "postgresql://fulfillment_app:${FULFILLMENT_DB_PASSWORD:?Set FULFILLMENT_DB_PASSWORD in .env}@fulfillment-db:5432/fulfillment"
-      FULFILLMENT_JWKS_URI: ${FULFILLMENT_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
-      FULFILLMENT_ORDER_BASE_URL: ${FULFILLMENT_ORDER_BASE_URL:-http://host.docker.internal:8086/}
+      FULFILLMENT_JWKS_URI: ${FULFILLMENT_DOCKER_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
+      FULFILLMENT_ORDER_BASE_URL: ${FULFILLMENT_DOCKER_ORDER_BASE_URL:-http://host.docker.internal:8086/}
       PORT: 8080
     ports: ["${FULFILLMENT_SERVICE_PORT:-8090}:8080"]
     depends_on:

@@ -21,9 +21,9 @@ services:
       ORDER_DB_URL: jdbc:postgresql://order-db:5432/orders
       ORDER_DB_USERNAME: order_app
       ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:-admin1234}
-      ORDER_JWKS_URI: ${ORDER_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
-      ORDER_CATALOG_BASE_URL: ${ORDER_CATALOG_BASE_URL:-http://host.docker.internal:8082/}
-      ORDER_PAYMENT_BASE_URL: ${ORDER_PAYMENT_BASE_URL:-http://host.docker.internal:8085/}
+      ORDER_JWKS_URI: ${ORDER_DOCKER_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
+      ORDER_CATALOG_BASE_URL: ${ORDER_DOCKER_CATALOG_BASE_URL:-http://host.docker.internal:8082/}
+      ORDER_PAYMENT_BASE_URL: ${ORDER_DOCKER_PAYMENT_BASE_URL:-http://host.docker.internal:8085/}
       PORT: 8080
     ports: ["${ORDER_SERVICE_PORT:-8086}:8080"]
     depends_on:

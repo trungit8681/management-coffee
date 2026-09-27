@@ -1,0 +1,44 @@
+_format_version: "3.0"
+_transform: true
+plugins:
+  - name: correlation-id
+    config: {header_name: X-Correlation-ID, generator: uuid, echo_downstream: true}
+  - name: cors
+    config:
+      origins: [{{ .Values.global.frontendOrigin | quote }}]
+      methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+      headers: [Authorization, Content-Type, Idempotency-Key, If-Match, X-Correlation-ID]
+      exposed_headers: [X-Correlation-ID, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset]
+      credentials: true
+      max_age: 3600
+  - name: request-size-limiting
+    config: {allowed_payload_size: 1}
+services:
+  - name: identity-auth
+    url: http://identity-service:8080
+    retries: 0
+    connect_timeout: 3000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes: [{name: identity-auth-api, paths: [/api/v1/auth, /.well-known/jwks.json], strip_path: false}]
+    plugins: [{name: rate-limiting, config: {minute: 30, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]
+  - name: identity-admin
+    url: http://identity-service:8080
+    retries: 0
+    connect_timeout: 3000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes: [{name: identity-admin-api, paths: [/api/v1/identity], strip_path: false}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]
+{{- $routes := dict "organization" "/api/v1/organization" "catalog" "/api/v1/catalog" "inventory" "/api/v1/inventory" "procurement" "/api/v1/procurement" "order" "/api/v1/orders" "payment" "/api/v1/payments" "loyalty" "/api/v1/loyalty" "promotion" "/api/v1/promotions" "fulfillment" "/api/v1/fulfillment" "notification" "/api/v1/notifications" }}
+{{- range $name, $path := $routes }}
+  - name: {{ $name }}
+    url: http://{{ $name }}-service:8080
+    retries: 0
+    connect_timeout: 3000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes: [{name: {{ $name }}-api, paths: [{{ $path }}], strip_path: false}]
+    plugins: [{name: rate-limiting, config: {minute: {{ if eq $name "payment" }}60{{ else }}120{{ end }}, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]
+{{- end }}
+

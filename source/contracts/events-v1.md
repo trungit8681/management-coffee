@@ -1,10 +1,10 @@
 # Local outbox events, version 1
 
-Each event is inserted into the owning service's `outbox_event` table in the same PostgreSQL transaction as the business change. The table columns are `id`, `aggregate_id`, `event_type`, `payload`, `created_at`, and nullable `published_at`. `id` is the event identity for future idempotent consumers. The current deployment has no relay or broker; rows are **not** automatically delivered to another service.
+Each event is inserted into the owning service's `outbox_event` table in the same PostgreSQL transaction as the business change. The relay publishes a persistent envelope to the durable `coffee.events` RabbitMQ topic exchange and marks `published_at` only after publisher confirmation. A relay crash between publish and mark can redeliver, so consumers claim `eventId` in their local `inbox_event` table in the same transaction as their state change.
 
 | Owner | Event types | Current payload fields |
 |---|---|---|
-| Catalog | `ProductCreated.v1`, `PricePublished.v1` | productId/variantId; variantId/branchId/channel/unitPriceVnd/version |
+| Catalog | `ProductCreated.v1`, `PricePublished.v1`, `RecipePublished.v1` | productId/variantId; variantId/branchId/channel/unitPriceVnd/version; variantId/version/ingredients |
 | Inventory | `IngredientCreated.v1`, `StockMoved.v1` | ingredientId; movementId |
 | Procurement | `SupplierCreated.v1`, `PurchaseOrderCreated.v1`, `PurchaseOrderApproved.v1` | id |
 | Order | `OrderCreated.v1`, `OrderCashConfirmed.v1`, `OrderCancellationRequested.v1`, `OrderCashRefunded.v1` | orderId/branchId/totalVnd/channel; orderId/paymentId; orderId/status; orderId/refundId |
@@ -14,4 +14,4 @@ Each event is inserted into the owning service's `outbox_event` table in the sam
 | Fulfillment | `DeliveryCreated.v1`, `DeliveryAssigned.v1`, `DeliveryCompleted.v1`, `DeliveryFailed.v1` | deliveryId/orderId/branchId; deliveryId/driverId; deliveryId/orderId; deliveryId |
 | Notification | `TemplateCreated.v1`, `NotificationQueued.v1` | templateId; notificationId/recipientId/branchId |
 
-Before enabling a relay, define a transport envelope, consumer inbox table, retry/dead-letter policy, service credentials and PII minimization. Consumers must enforce uniqueness on event ID and tolerate out-of-order arrival. Existing payloads are local draft contracts and must be versioned before external subscription.
+The envelope fields are `eventId`, `eventType`, `source`, `aggregateId`, `occurredAt`, and `payload`. Order consumes `CashPaymentRecorded.v1` through a durable queue, retries five times with bounded backoff, then dead-letters to `order.cash-payment-recorded.v1.dlq`. Consumers enforce uniqueness on event ID, tolerate out-of-order arrival, and must not publish credentials or unnecessary PII.

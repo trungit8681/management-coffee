@@ -33,5 +33,14 @@ services:
       retries: 10
       start_period: 30s
     restart: unless-stopped
+  loyalty-outbox-relay:
+    build: {context: ../../infrastructure/outbox-relay}
+    environment:
+      DATABASE_URL: "postgresql://loyalty_app:${LOYALTY_DB_PASSWORD:?Set LOYALTY_DB_PASSWORD in .env}@loyalty-db:5432/loyalty"
+      RABBITMQ_URL: "amqp://${RABBITMQ_USER:-coffee_app}:${RABBITMQ_PASSWORD:-coffee_dev_password}@host.docker.internal:${RABBITMQ_PORT:-5672}"
+      EVENT_SOURCE: loyalty-service
+    depends_on:
+      loyalty-db: {condition: service_healthy}
+    restart: unless-stopped
 volumes:
   loyalty_db_data: {name: coffee_loyalty_standalone_db_data}

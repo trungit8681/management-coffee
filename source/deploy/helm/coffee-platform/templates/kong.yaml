@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: kong-config, namespace: {{ include "coffee.namespace" . }}}
+data:
+  kong.yml: |
+{{ tpl (.Files.Get "files/kong.yml") . | indent 4 }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: kong, namespace: {{ include "coffee.namespace" . }}}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Service
+metadata: {name: kong, namespace: {{ include "coffee.namespace" . }}, labels: {app.kubernetes.io/name: kong, app.kubernetes.io/part-of: coffee-platform}}
+spec:
+  type: {{ .Values.kong.serviceType }}
+  selector: {app.kubernetes.io/name: kong}
+  ports: [{name: proxy, port: 8000, targetPort: proxy}, {name: status, port: 8100, targetPort: status}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: kong, namespace: {{ include "coffee.namespace" . }}}
+spec:
+  replicas: {{ .Values.kong.replicas }}
+  strategy: {type: RollingUpdate, rollingUpdate: {maxUnavailable: 0, maxSurge: 1}}
+  selector: {matchLabels: {app.kubernetes.io/name: kong}}
+  template:
+    metadata: {labels: {app.kubernetes.io/name: kong, app.kubernetes.io/part-of: coffee-platform}}
+    spec:
+      serviceAccountName: kong
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 45
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: kong
+          image: {{ .Values.kong.image }}
+          ports: [{name: proxy, containerPort: 8000}, {name: status, containerPort: 8100}]
+          env:
+            - {name: KONG_DATABASE, value: "off"}
+            - {name: KONG_DECLARATIVE_CONFIG, value: /kong/config/kong.yml}
+            - {name: KONG_PROXY_LISTEN, value: "0.0.0.0:8000"}
+            - {name: KONG_ADMIN_LISTEN, value: "off"}
+            - {name: KONG_STATUS_LISTEN, value: "0.0.0.0:8100"}
+            - {name: KONG_PREFIX, value: /kong_prefix/}
+            - {name: KONG_NGINX_WORKER_PROCESSES, value: {{ default "auto" .Values.kong.workerProcesses | quote }}}
+          startupProbe: {httpGet: {path: /status, port: status}, periodSeconds: 5, timeoutSeconds: 3, failureThreshold: 30}
+          readinessProbe: {httpGet: {path: /status/ready, port: status}, periodSeconds: 10, timeoutSeconds: 3}
+          livenessProbe: {httpGet: {path: /status, port: status}, periodSeconds: 20, timeoutSeconds: 3}
+          lifecycle: {preStop: {exec: {command: [sh, -c, sleep 10]}}}
+          resources: {requests: {cpu: 200m, memory: 256Mi}, limits: {cpu: "1", memory: 768Mi}}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          volumeMounts: [{name: config, mountPath: /kong/config, readOnly: true}, {name: tmp, mountPath: /tmp}, {name: prefix, mountPath: /kong_prefix}]
+      volumes: [{name: config, configMap: {name: kong-config}}, {name: tmp, emptyDir: {}}, {name: prefix, emptyDir: {}}]
+{{- if .Values.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: kong, namespace: {{ include "coffee.namespace" . }}}
+spec: {minAvailable: {{ .Values.pdb.minAvailable }}, selector: {matchLabels: {app.kubernetes.io/name: kong}}}
+{{- end }}
+{{- if .Values.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: kong, namespace: {{ include "coffee.namespace" . }}}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: kong}
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 65}}}]
+{{- end }}
+

@@ -1,0 +1,8 @@
+apiVersion: v2
+name: coffee-platform
+description: Complete coffee management backend, data stores, messaging, relays and Kong gateway
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.28.0-0"
+

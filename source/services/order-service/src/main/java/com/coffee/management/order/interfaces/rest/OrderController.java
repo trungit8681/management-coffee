@@ -37,6 +37,10 @@ public class OrderController {
     public record CashQuote(UUID orderId, UUID branchId, long totalVnd, String status) {
     }
 
+    public record CheckoutRequest(UUID customerId, @Min(0) long points, String voucherCode,
+            @Min(1) long cashReceivedVnd) {
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public JdbcOrderRepository.Snapshot create(@Valid @RequestBody CreateRequest body,
@@ -64,6 +68,16 @@ public class OrderController {
     public JdbcOrderRepository.Snapshot confirm(@PathVariable UUID id, @Valid @RequestBody ConfirmRequest body,
             @RequestHeader("Authorization") String bearer, @AuthenticationPrincipal Actor actor) {
         return service.confirm(id, body.paymentId(), actor, bearer);
+    }
+
+    @PostMapping("/{id}/checkout-cash")
+    public ResponseEntity<OrderApplicationService.CheckoutResult> checkout(@PathVariable UUID id,
+            @Valid @RequestBody CheckoutRequest body, @RequestHeader("Idempotency-Key") String key,
+            @RequestHeader("Authorization") String bearer, @AuthenticationPrincipal Actor actor) {
+        var result = service.checkoutCash(id, new OrderApplicationService.Checkout(body.customerId(), body.points(),
+                body.voucherCode(), body.cashReceivedVnd()), key, actor, bearer);
+        return ResponseEntity.status("COMPLETED".equals(result.status()) ? HttpStatus.CREATED : HttpStatus.ACCEPTED)
+                .body(result);
     }
 
     @PostMapping("/{id}/cancel")

@@ -1,0 +1,54 @@
+@startuml
+title SEQUENCE 11 - CHECKOUT SAGA TIỀN MẶT
+autonumber
+hide footbox
+actor "Thu ngân" as Cashier
+boundary "Kong" as Kong
+control "Order Service\nSaga Orchestrator" as Order
+control "Promotion Service" as Promo
+control "Loyalty Service" as Loyalty
+control "Inventory Service" as Inventory
+control "Payment Service" as Payment
+queue "RabbitMQ" as Rabbit
+database "Order DB\nSaga + Inbox + Outbox" as OrderDB
+
+Cashier -> Kong: POST /orders/{id}/checkout-cash\nIdempotency-Key
+Kong -> Order: checkout
+Order -> OrderDB: claim saga runner lease
+Order -> Promo: reserve voucher(orderId)
+Order -> Loyalty: reserve points(orderId)
+Order -> OrderDB: snapshot payable + BENEFITS_RESERVED
+loop Mỗi ingredient trong recipe snapshot
+  Order -> Inventory: deduct(orderId, ingredient)\nidempotency key theo ingredient
+  Inventory --> Order: movementId
+  Order -> OrderDB: lưu stock step DONE
+end
+Order -> Payment: collect cash(orderId)\nidempotency key
+Payment --> Order: paymentId
+Order -> OrderDB: PAID_PENDING
+Order -> Promo: commit voucher
+Order -> Loyalty: commit points
+Order -> OrderDB: COMPLETED
+Order --> Cashier: 201 completed
+
+alt Lỗi trước khi gọi Payment
+  Order -> OrderDB: COMPENSATING
+  loop Stock step đã DONE
+    Order -> Inventory: reversal(orderId, ingredient)
+  end
+  Order -> Loyalty: release points
+  Order -> Promo: release voucher
+  Order -> OrderDB: FAILED + khôi phục subtotal
+else Lỗi/timeout sau khi bắt đầu Payment
+  Order -> OrderDB: PAID_PENDING
+  Order --> Cashier: 202 retry cùng key
+end
+
+Payment -> Rabbit: CashPaymentRecorded.v1\nqua outbox relay + publisher confirm
+Rabbit -> Order: at-least-once delivery
+Order -> OrderDB: INSERT inbox_event ON CONFLICT DO NOTHING
+note right of Rabbit
+  Retry tối đa 5 lần.
+  Poison message -> DLQ.
+end note
+@enduml

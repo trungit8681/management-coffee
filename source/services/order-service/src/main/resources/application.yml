@@ -8,12 +8,28 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  rabbitmq:
+    host: ${ORDER_RABBITMQ_HOST:localhost}
+    port: ${ORDER_RABBITMQ_PORT:5672}
+    username: ${ORDER_RABBITMQ_USER:coffee_app}
+    password: ${ORDER_RABBITMQ_PASSWORD:coffee_dev_password}
+    listener.simple:
+      default-requeue-rejected: false
+      retry.enabled: true
+      retry.max-attempts: 5
+      retry.initial-interval: 500ms
+      retry.multiplier: 2
+      retry.max-interval: 5s
 server:
   port: ${PORT:${ORDER_SERVICE_PORT:8086}}
   shutdown: graceful
 order:
+  messaging.enabled: ${ORDER_MESSAGING_ENABLED:false}
   catalog-base-url: ${ORDER_CATALOG_BASE_URL:http://localhost:8082/}
   payment-base-url: ${ORDER_PAYMENT_BASE_URL:http://localhost:8085/}
+  inventory-base-url: ${ORDER_INVENTORY_BASE_URL:http://localhost:8083/}
+  loyalty-base-url: ${ORDER_LOYALTY_BASE_URL:http://localhost:8087/}
+  promotion-base-url: ${ORDER_PROMOTION_BASE_URL:http://localhost:8088/}
   jwt:
     issuer: ${ORDER_JWT_ISSUER:coffee-identity}
     audience: ${ORDER_JWT_AUDIENCE:coffee-platform}

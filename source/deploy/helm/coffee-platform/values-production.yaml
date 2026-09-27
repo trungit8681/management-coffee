@@ -1,0 +1,22 @@
+global:
+  imageRegistry: ghcr.io/your-organization/coffee
+  imageTag: "replace-with-git-sha"
+  frontendOrigin: https://coffee.example.com
+  replicas: 2
+storageClassName: premium-rwo
+imagePullSecrets:
+  - name: registry-credentials
+kong:
+  serviceType: ClusterIP
+ingress:
+  enabled: true
+  className: nginx
+  host: api.coffee.example.com
+  tlsSecretName: coffee-api-tls
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+pdb: {enabled: true, minAvailable: 1}
+networkPolicy: {enabled: true}
+

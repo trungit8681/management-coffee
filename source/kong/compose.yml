@@ -1,6 +1,18 @@
 name: coffee-gateway
 
 services:
+  gateway-redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - gateway_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
   kong:
     image: kong:3.9.1
     environment:
@@ -15,6 +27,9 @@ services:
       - "${BUSINESS_GATEWAY_PORT:-8000}:8000"
     extra_hosts:
       - host.docker.internal:host-gateway
+    depends_on:
+      gateway-redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "kong", "health"]
       interval: 10s
@@ -23,3 +38,6 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+volumes:
+  gateway_redis_data:
+    name: coffee_gateway_redis_data

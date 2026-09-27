@@ -24,7 +24,7 @@ services:
         strip_path: false
     plugins:
       - name: rate-limiting
-        config: {minute: 30, policy: local}
+        config: {minute: 30, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}
 
   - name: identity
     url: http://host.docker.internal:8080
@@ -38,7 +38,7 @@ services:
         strip_path: false
     plugins:
       - name: rate-limiting
-        config: {minute: 120, policy: local}
+        config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}
 
   - name: organization
     url: http://host.docker.internal:8081
@@ -52,7 +52,7 @@ services:
         strip_path: false
     plugins:
       - name: rate-limiting
-        config: {minute: 120, policy: local}
+        config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}
 
   - name: catalog
     url: http://host.docker.internal:8082
@@ -61,7 +61,7 @@ services:
     read_timeout: 10000
     write_timeout: 10000
     routes: [{name: catalog-api, paths: ["/api/v1/catalog"], strip_path: false}]
-    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]
 
   - name: inventory
     url: http://host.docker.internal:8083
@@ -70,7 +70,7 @@ services:
     read_timeout: 10000
     write_timeout: 10000
     routes: [{name: inventory-api, paths: ["/api/v1/inventory"], strip_path: false}]
-    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]
 
   - name: procurement
     url: http://host.docker.internal:8084
@@ -79,7 +79,7 @@ services:
     read_timeout: 10000
     write_timeout: 10000
     routes: [{name: procurement-api, paths: ["/api/v1/procurement"], strip_path: false}]
-    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]
 
   - name: payments
     url: http://host.docker.internal:8085
@@ -88,7 +88,7 @@ services:
     read_timeout: 10000
     write_timeout: 10000
     routes: [{name: payment-api, paths: ["/api/v1/payments"], strip_path: false}]
-    plugins: [{name: rate-limiting, config: {minute: 60, policy: local}}]
+    plugins: [{name: rate-limiting, config: {minute: 60, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]
 
   - name: orders
     url: http://host.docker.internal:8086
@@ -97,7 +97,7 @@ services:
     read_timeout: 10000
     write_timeout: 10000
     routes: [{name: order-api, paths: ["/api/v1/orders"], strip_path: false}]
-    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]
 
   - name: loyalty
     url: http://host.docker.internal:8087
@@ -106,7 +106,7 @@ services:
     read_timeout: 10000
     write_timeout: 10000
     routes: [{name: loyalty-api, paths: ["/api/v1/loyalty"], strip_path: false}]
-    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]
 
   - name: promotion
     url: http://host.docker.internal:8088
@@ -115,7 +115,7 @@ services:
     read_timeout: 10000
     write_timeout: 10000
     routes: [{name: promotion-api, paths: ["/api/v1/promotions"], strip_path: false}]
-    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]
 
   - name: notification
     url: http://host.docker.internal:8089
@@ -124,7 +124,7 @@ services:
     read_timeout: 10000
     write_timeout: 10000
     routes: [{name: notification-api, paths: ["/api/v1/notifications"], strip_path: false}]
-    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]
 
   - name: fulfillment
     url: http://host.docker.internal:8090
@@ -133,4 +133,4 @@ services:
     read_timeout: 10000
     write_timeout: 10000
     routes: [{name: fulfillment-api, paths: ["/api/v1/fulfillment"], strip_path: false}]
-    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]

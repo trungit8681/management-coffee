@@ -97,25 +97,32 @@ public class JwtService {
         Path privateFile = Path.of(privatePath), publicFile = Path.of(publicPath),
                 lockFile = privateFile.resolveSibling("jwt-key.lock");
         try {
+            if (!generate) {
+                if (!Files.exists(privateFile) || !Files.exists(publicFile))
+                    throw new IllegalStateException("Configured identity signing key files do not exist");
+                return readKey(keyId, privateFile, publicFile);
+            }
             Files.createDirectories(privateFile.getParent());
             try (FileChannel channel = FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
                     FileLock ignored = channel.lock()) {
                 if (!Files.exists(privateFile) || !Files.exists(publicFile)) {
-                    if (!generate)
-                        throw new IllegalStateException("Configured identity signing key files do not exist");
                     RSAKey generated = new RSAKeyGenerator(2048).keyID(keyId).generate();
                     writePem(privateFile, "PRIVATE KEY", generated.toRSAPrivateKey().getEncoded(), true);
                     writePem(publicFile, "PUBLIC KEY", generated.toRSAPublicKey().getEncoded(), false);
                 }
-                RSAPrivateKey privateKey = (RSAPrivateKey) KeyFactory.getInstance("RSA")
-                        .generatePrivate(new PKCS8EncodedKeySpec(readPem(privateFile, "PRIVATE KEY")));
-                RSAPublicKey publicKey = (RSAPublicKey) KeyFactory.getInstance("RSA")
-                        .generatePublic(new X509EncodedKeySpec(readPem(publicFile, "PUBLIC KEY")));
-                return new RSAKey.Builder(publicKey).privateKey(privateKey).keyID(keyId).build();
+                return readKey(keyId, privateFile, publicFile);
             }
         } catch (Exception e) {
             throw new IllegalStateException("Unable to load or create identity signing key", e);
         }
+    }
+
+    private static RSAKey readKey(String keyId, Path privateFile, Path publicFile) throws Exception {
+        RSAPrivateKey privateKey = (RSAPrivateKey) KeyFactory.getInstance("RSA")
+                .generatePrivate(new PKCS8EncodedKeySpec(readPem(privateFile, "PRIVATE KEY")));
+        RSAPublicKey publicKey = (RSAPublicKey) KeyFactory.getInstance("RSA")
+                .generatePublic(new X509EncodedKeySpec(readPem(publicFile, "PUBLIC KEY")));
+        return new RSAKey.Builder(publicKey).privateKey(privateKey).keyID(keyId).build();
     }
 
     private static byte[] readPem(Path path, String type) throws Exception {

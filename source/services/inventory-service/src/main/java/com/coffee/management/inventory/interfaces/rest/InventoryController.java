@@ -56,6 +56,15 @@ public class InventoryController {
                 key, actor));
     }
 
+    @PostMapping("/reversals")
+    @ResponseStatus(HttpStatus.CREATED)
+    public IdResult reverse(@Valid @RequestBody MoveRequest body, @RequestHeader("Idempotency-Key") String key,
+            @AuthenticationPrincipal Actor actor) {
+        return new IdResult(service.move(
+                new StockMovement(body.branchId(), body.ingredientId(), body.quantity(), "REVERSAL", body.referenceId()),
+                key, actor));
+    }
+
     @GetMapping("/branches/{branchId}/ingredients/{ingredientId}/balance")
     public BalanceResult balance(@PathVariable UUID branchId, @PathVariable UUID ingredientId,
             @AuthenticationPrincipal Actor actor) {

@@ -14,7 +14,12 @@ The nine services under `services/` own separate PostgreSQL databases. `compose-
 | fulfillment | Delivery creation/assignment, failed or paid handover | Delivery, delivery attempt |
 | notification | Template, queued in-app message, inbox worker | Template, notification, delivery log |
 
-All command services write a local outbox row with the business change. This increment does **not** include an event broker or outbox relay. Promotion, loyalty, inventory and notification actions are available as explicit authenticated commands; order does not yet orchestrate them. Supplier purchase-order receipt validation, recipe-based automatic stock deduction, stocktake/transfer, partial refunds, external delivery partners, and email/SMS/push adapters also remain separate increments. These APIs must not be treated as a complete production checkout saga.
+Command services write a local outbox row with the business change. Checkout is coordinated by Order across Promotion, Loyalty, Inventory and cash Payment with durable saga state, idempotent steps, pre-payment compensation, and a non-compensating `PAID_PENDING` state after cash may have been recorded. RabbitMQ relays use publisher confirms; Order deduplicates payment events in a local inbox and routes poison messages to a DLQ after bounded retries. Supplier purchase-order receipt validation, stocktake/transfer, partial refunds, external delivery partners, and email/SMS/push adapters remain separate increments.
+
+The single source of truth for Kubernetes deployment is the Helm chart at `source/deploy/helm/coffee-platform/`. The canonical build, installation, GitOps, operations, upgrade and rollback guide is `document/KUBERNETES-VAN-HANH.md`.
+For Docker Desktop Kubernetes, follow `document/KUBERNETES-LOCAL.md`; it includes the local values, Helm namespace ownership, Secret/JWT preflight checks, and first-install recovery rules.
+Use `source/scripts/port-forward-databases.ps1` to expose all service-owned PostgreSQL databases on distinct localhost ports for local administration.
+The same local runbook also documents repeat deployments: rebuilding one or all services, immutable image tags, Secret refresh, migration rollout, and the checklist for adding a new service.
 
 ## Local run: one service
 

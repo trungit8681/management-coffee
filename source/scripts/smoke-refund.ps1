@@ -7,9 +7,13 @@ function New-Key { $headers['Idempotency-Key']=[guid]::NewGuid().ToString() }
 function Post-Json($path,$body) { Invoke-RestMethod -Method Post -Uri "$GatewayUrl$path" -Headers $headers -ContentType 'application/json' -Body ($body|ConvertTo-Json -Depth 8) }
 $branch=[guid]::NewGuid().ToString()
 New-Key
+$ingredient=Post-Json '/api/v1/inventory/ingredients' @{code="REFUND-$([guid]::NewGuid().ToString('N'))";name='Refund coffee beans';unit='g'}
+New-Key
 $product=Post-Json '/api/v1/catalog/products' @{sku="REFUND-$([guid]::NewGuid().ToString('N'))";name='Refund coffee';category='DRINK';variantCode='M';variantName='Medium'}
 New-Key
 $null=Invoke-RestMethod -Method Put -Uri "$GatewayUrl/api/v1/catalog/variants/$($product.variantId)/prices" -Headers $headers -ContentType 'application/json' -Body (@{branchId=$branch;channel='POS';unitPriceVnd=19000}|ConvertTo-Json)
+New-Key
+$null=Invoke-RestMethod -Method Put -Uri "$GatewayUrl/api/v1/catalog/variants/$($product.variantId)/recipe" -Headers $headers -ContentType 'application/json' -Body (@{ingredients=@(@{ingredientId=$ingredient.id;quantity=20})}|ConvertTo-Json -Depth 5)
 New-Key
 $order=Post-Json '/api/v1/orders' @{branchId=$branch;channel='POS';items=@(@{variantId=$product.variantId;quantity=1})}
 New-Key

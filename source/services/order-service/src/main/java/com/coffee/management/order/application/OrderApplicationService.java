@@ -20,15 +20,119 @@ public class OrderApplicationService {
 
     private final CatalogPort catalog;
     private final PaymentPort payments;
+    private final CheckoutPort checkout;
     private final JdbcOrderRepository repository;
     private final TransactionTemplate transactions;
 
-    public OrderApplicationService(CatalogPort catalog, PaymentPort payments, JdbcOrderRepository repository,
+    public OrderApplicationService(CatalogPort catalog, PaymentPort payments, CheckoutPort checkout,
+            JdbcOrderRepository repository,
             TransactionTemplate transactions) {
         this.catalog = catalog;
         this.payments = payments;
+        this.checkout = checkout;
         this.repository = repository;
         this.transactions = transactions;
+    }
+
+    public record Checkout(UUID customerId, long points, String voucherCode, long cashReceivedVnd) {
+    }
+
+    public record CheckoutResult(UUID orderId, String status, UUID paymentId, JdbcOrderRepository.Snapshot order) {
+    }
+
+    public CheckoutResult checkoutCash(UUID id, Checkout request, String key, Actor actor, String bearer) {
+        var order = repository.find(id);
+        if (order == null)
+            throw new OrderException(404, "ORDER_NOT_FOUND", "Order not found");
+        actor.require("order:collect_cash", order.branchId());
+        if (key == null || key.isBlank() || key.length() > 128 || request.cashReceivedVnd() <= 0 || request.points() < 0
+                || (request.points() > 0 && request.customerId() == null))
+            throw new OrderException(400, "INVALID_CHECKOUT", "Invalid checkout request");
+        String fingerprint = checkoutHash(id, request, actor.userId());
+        var saga = transactions.execute(tx -> repository.startSaga(id, key, fingerprint, request.voucherCode(),
+                request.customerId(), request.points(), request.cashReceivedVnd()));
+        if ("COMPLETED".equals(saga.status()))
+            return new CheckoutResult(id, saga.status(), saga.paymentId(), repository.find(id));
+        if ("FAILED".equals(saga.status()))
+            throw new OrderException(409, "CHECKOUT_FAILED", "Checkout was compensated; use a new order");
+        UUID runner = UUID.randomUUID();
+        if (!transactions.execute(tx -> repository.acquireSaga(id, runner)))
+            return new CheckoutResult(id, "IN_PROGRESS", saga.paymentId(), repository.find(id));
+        boolean paymentStarted = "PAID_PENDING".equals(saga.status());
+        try {
+            long voucherDiscount = 0, pointsDiscount = request.points();
+            if (request.voucherCode() != null && !request.voucherCode().isBlank()) {
+                var benefit = checkout.reserveVoucher(id, order.branchId(), request.voucherCode(), order.totalVnd(),
+                        bearer);
+                voucherDiscount = benefit.discountVnd();
+                transactions.executeWithoutResult(
+                        tx -> repository.sagaStep(id, "VOUCHER", benefit.id(), benefit.discountVnd()));
+            }
+            if (request.points() > 0) {
+                var benefit = checkout.reservePoints(id, request.customerId(), request.points(), bearer);
+                transactions
+                        .executeWithoutResult(tx -> repository.sagaStep(id, "POINTS", benefit.id(), request.points()));
+            }
+            final long vd = voucherDiscount, pd = pointsDiscount;
+            order = transactions.execute(tx -> {
+                var updated = repository.applyDiscount(id, vd, pd);
+                repository.sagaStatus(id, "BENEFITS_RESERVED", null, null);
+                return updated;
+            });
+            var done = repository.sagaSteps(id, "STOCK").stream().map(JdbcOrderRepository.SagaStep::resourceId)
+                    .collect(java.util.stream.Collectors.toSet());
+            for (var stock : repository.requiredStock(id).entrySet())
+                if (!done.contains(stock.getKey())) {
+                    checkout.deduct(id, order.branchId(), stock.getKey(), stock.getValue(),
+                            key + ":stock:" + stock.getKey(), bearer);
+                    UUID ingredient = stock.getKey();
+                    long quantity = stock.getValue();
+                    transactions.executeWithoutResult(tx -> repository.sagaStep(id, "STOCK", ingredient, quantity));
+                }
+            transactions.executeWithoutResult(tx -> repository.sagaStatus(id, "STOCK_DEDUCTED", null, null));
+            paymentStarted = true;
+            var paid = checkout.collect(id, request.cashReceivedVnd(), key + ":payment", bearer);
+            UUID paymentId = paid.id();
+            transactions.executeWithoutResult(tx -> repository.sagaStatus(id, "PAID_PENDING", paymentId, null));
+            if (request.voucherCode() != null && !request.voucherCode().isBlank())
+                checkout.finishVoucher(id, true, bearer);
+            if (request.points() > 0)
+                checkout.finishPoints(id, true, bearer);
+            transactions.executeWithoutResult(tx -> repository.sagaStatus(id, "COMPLETED", paymentId, null));
+            return new CheckoutResult(id, "COMPLETED", paymentId, repository.find(id));
+        } catch (RuntimeException failure) {
+            if (paymentStarted) {
+                transactions.executeWithoutResult(
+                        tx -> repository.sagaStatus(id, "PAID_PENDING", null, failure.getMessage()));
+                throw new OrderException(202, "CHECKOUT_FINALIZATION_PENDING",
+                        "Cash may be recorded; retry with the same Idempotency-Key");
+            }
+            compensate(id, order.branchId(), request, bearer, key, failure);
+            throw failure;
+        } finally {
+            transactions.executeWithoutResult(tx -> repository.releaseSaga(id, runner));
+        }
+    }
+
+    private void compensate(UUID orderId, UUID branchId, Checkout request, String bearer, String key,
+            RuntimeException cause) {
+        transactions
+                .executeWithoutResult(tx -> repository.sagaStatus(orderId, "COMPENSATING", null, cause.getMessage()));
+        for (var step : repository.sagaSteps(orderId, "STOCK"))
+            if ("DONE".equals(step.status())) {
+                checkout.reverse(orderId, branchId, step.resourceId(), step.quantity(),
+                        key + ":reverse:" + step.resourceId(), bearer);
+                transactions.executeWithoutResult(tx -> repository.compensated(orderId, "STOCK", step.resourceId()));
+            }
+        if (request.points() > 0 && !repository.sagaSteps(orderId, "POINTS").isEmpty())
+            checkout.finishPoints(orderId, false, bearer);
+        if (request.voucherCode() != null && !request.voucherCode().isBlank()
+                && !repository.sagaSteps(orderId, "VOUCHER").isEmpty())
+            checkout.finishVoucher(orderId, false, bearer);
+        transactions.executeWithoutResult(tx -> {
+            repository.clearDiscount(orderId);
+            repository.sagaStatus(orderId, "FAILED", null, cause.getMessage());
+        });
     }
 
     public JdbcOrderRepository.Snapshot create(Create request, String key, Actor actor, String bearer) {
@@ -55,7 +159,12 @@ public class OrderApplicationService {
                 throw new OrderException(409, "ITEM_NOT_SELLABLE", "Item unavailable or price changed");
             var line = new Order.Item(requested.variantId(), requested.quantity(), offer.unitPriceVnd(),
                     Math.multiplyExact(requested.quantity(), offer.unitPriceVnd()));
-            priced.add(new JdbcOrderRepository.PricedItem(line, offer.priceVersion()));
+            if (offer.recipeVersion() <= 0 || offer.recipe() == null || offer.recipe().isEmpty())
+                throw new OrderException(409, "RECIPE_NOT_PUBLISHED", "Item recipe is not published");
+            priced.add(new JdbcOrderRepository.PricedItem(line, offer.priceVersion(), offer.recipeVersion(),
+                    offer.recipe().stream()
+                            .map(i -> new JdbcOrderRepository.RecipeIngredient(i.ingredientId(), i.quantity()))
+                            .toList()));
         }
         long total = priced.stream().mapToLong(p -> p.item().lineTotalVnd()).reduce(0, Math::addExact);
         var order = new Order(UUID.randomUUID(), request.branchId(), request.channel(),
@@ -130,6 +239,17 @@ public class OrderApplicationService {
                 input.append(':').append(item.variantId()).append(':').append(item.quantity());
             return HexFormat.of().formatHex(
                     MessageDigest.getInstance("SHA-256").digest(input.toString().getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
+    }
+
+    private static String checkoutHash(UUID orderId, Checkout request, UUID actorId) {
+        try {
+            String input = actorId + ":" + orderId + ":" + request.customerId() + ":" + request.points() + ":"
+                    + request.voucherCode() + ":" + request.cashReceivedVnd();
+            return HexFormat.of()
+                    .formatHex(MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception ex) {
             throw new IllegalStateException(ex);
         }

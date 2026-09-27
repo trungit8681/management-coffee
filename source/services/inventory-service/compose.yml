@@ -33,5 +33,14 @@ services:
       retries: 10
       start_period: 30s
     restart: unless-stopped
+  inventory-outbox-relay:
+    build: {context: ../../infrastructure/outbox-relay}
+    environment:
+      DATABASE_URL: "postgresql://inventory_app:${INVENTORY_DB_PASSWORD:-admin1234}@inventory-db:5432/inventory"
+      RABBITMQ_URL: "amqp://${RABBITMQ_USER:-coffee_app}:${RABBITMQ_PASSWORD:-coffee_dev_password}@host.docker.internal:${RABBITMQ_PORT:-5672}"
+      EVENT_SOURCE: inventory-service
+    depends_on:
+      inventory-db: {condition: service_healthy}
+    restart: unless-stopped
 volumes:
   inventory_db_data: {name: coffee_inventory_standalone_db_data}

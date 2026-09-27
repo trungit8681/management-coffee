@@ -7,3 +7,7 @@
 .env.*
 !.env.example
 
+# Local Kubernetes credentials and signing keys
+source/deploy/helm/coffee-platform/coffee-platform.env
+source/key/
+

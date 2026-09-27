@@ -1,0 +1,174 @@
+namespaceOverride: coffee-platform
+imagePullSecrets: []
+secretName: coffee-platform-secrets
+jwtSecretName: identity-jwt-keys
+storageClassName: ""
+
+global:
+  imageRegistry: coffee-local
+  imageTag: local
+  frontendOrigin: http://localhost:3000
+  replicas: 1
+  javaResources: {requests: {cpu: 200m, memory: 320Mi}, limits: {cpu: "1", memory: 768Mi}}
+  nodeResources: {requests: {cpu: 100m, memory: 128Mi}, limits: {cpu: 500m, memory: 384Mi}}
+
+databases:
+  identity: {database: identity, user: identity_app, size: 10Gi}
+  organization: {database: organization, user: organization_app, size: 10Gi}
+  catalog: {database: catalog, user: catalog_app, size: 10Gi}
+  inventory: {database: inventory, user: inventory_app, size: 20Gi}
+  procurement: {database: procurement, user: procurement_app, size: 10Gi}
+  order: {database: orders, user: order_app, size: 20Gi}
+  payment: {database: payment, user: payment_app, size: 20Gi}
+  loyalty: {database: loyalty, user: loyalty_app, size: 10Gi}
+  promotion: {database: promotion, user: promotion_app, size: 10Gi}
+  fulfillment: {database: fulfillment, user: fulfillment_app, size: 10Gi}
+  notification: {database: notification, user: notification_app, size: 10Gi}
+
+services:
+  identity:
+    runtime: java
+    healthBase: /actuator/health
+    live: liveness
+    ready: readiness
+    env:
+      IDENTITY_DB_URL: {secret: IDENTITY_DB_URL}
+      IDENTITY_DB_USERNAME: {value: identity_app}
+      IDENTITY_DB_PASSWORD: {secret: IDENTITY_DB_PASSWORD}
+      IDENTITY_DB_POOL_SIZE: {value: "10"}
+      IDENTITY_REDIS_HOST: {value: identity-redis}
+      IDENTITY_REDIS_PORT: {value: "6379"}
+      IDENTITY_JWT_KEY_ID: {value: production-1}
+      IDENTITY_JWT_PRIVATE_KEY_PATH: {value: /var/lib/identity/keys/jwt-private.pem}
+      IDENTITY_JWT_PUBLIC_KEY_PATH: {value: /var/lib/identity/keys/jwt-public.pem}
+      IDENTITY_JWT_GENERATE_IF_MISSING: {value: "false"}
+      IDENTITY_BOOTSTRAP_ADMIN_USERNAME: {secret: IDENTITY_BOOTSTRAP_ADMIN_USERNAME}
+      IDENTITY_BOOTSTRAP_ADMIN_PASSWORD: {secret: IDENTITY_BOOTSTRAP_ADMIN_PASSWORD}
+      IDENTITY_BOOTSTRAP_ADMIN_DISPLAY_NAME: {value: System Administrator}
+    jwtVolume: true
+  organization:
+    runtime: java
+    healthBase: /actuator/health
+    live: liveness
+    ready: readiness
+    env:
+      ORGANIZATION_DB_URL: {secret: ORGANIZATION_DB_URL}
+      ORGANIZATION_DB_USERNAME: {value: organization_app}
+      ORGANIZATION_DB_PASSWORD: {secret: ORGANIZATION_DB_PASSWORD}
+      ORGANIZATION_JWKS_URI: {value: http://identity-service:8080/.well-known/jwks.json}
+  catalog:
+    runtime: node
+    healthBase: /health
+    live: live
+    ready: ready
+    env:
+      CATALOG_DB_URL: {secret: CATALOG_DB_URL}
+      CATALOG_JWKS_URI: {value: http://identity-service:8080/.well-known/jwks.json}
+  inventory:
+    runtime: java
+    healthBase: /actuator/health
+    live: liveness
+    ready: readiness
+    env:
+      INVENTORY_DB_URL: {secret: INVENTORY_DB_URL}
+      INVENTORY_DB_USERNAME: {value: inventory_app}
+      INVENTORY_DB_PASSWORD: {secret: INVENTORY_DB_PASSWORD}
+      INVENTORY_JWKS_URI: {value: http://identity-service:8080/.well-known/jwks.json}
+  procurement:
+    runtime: java
+    healthBase: /actuator/health
+    live: liveness
+    ready: readiness
+    env:
+      PROCUREMENT_DB_URL: {secret: PROCUREMENT_DB_URL}
+      PROCUREMENT_DB_USERNAME: {value: procurement_app}
+      PROCUREMENT_DB_PASSWORD: {secret: PROCUREMENT_DB_PASSWORD}
+      PROCUREMENT_JWKS_URI: {value: http://identity-service:8080/.well-known/jwks.json}
+  order:
+    runtime: java
+    healthBase: /actuator/health
+    live: liveness
+    ready: readiness
+    env:
+      ORDER_DB_URL: {secret: ORDER_DB_URL}
+      ORDER_DB_USERNAME: {value: order_app}
+      ORDER_DB_PASSWORD: {secret: ORDER_DB_PASSWORD}
+      ORDER_JWKS_URI: {value: http://identity-service:8080/.well-known/jwks.json}
+      ORDER_CATALOG_BASE_URL: {value: http://catalog-service:8080/}
+      ORDER_PAYMENT_BASE_URL: {value: http://payment-service:8080/}
+      ORDER_INVENTORY_BASE_URL: {value: http://inventory-service:8080/}
+      ORDER_LOYALTY_BASE_URL: {value: http://loyalty-service:8080/}
+      ORDER_PROMOTION_BASE_URL: {value: http://promotion-service:8080/}
+      ORDER_MESSAGING_ENABLED: {value: "true"}
+      ORDER_RABBITMQ_HOST: {value: rabbitmq}
+      ORDER_RABBITMQ_PORT: {value: "5672"}
+      ORDER_RABBITMQ_USER: {secret: RABBITMQ_USER}
+      ORDER_RABBITMQ_PASSWORD: {secret: RABBITMQ_PASSWORD}
+  payment:
+    runtime: java
+    healthBase: /actuator/health
+    live: liveness
+    ready: readiness
+    env:
+      PAYMENT_DB_URL: {secret: PAYMENT_DB_URL}
+      PAYMENT_DB_USERNAME: {value: payment_app}
+      PAYMENT_DB_PASSWORD: {secret: PAYMENT_DB_PASSWORD}
+      PAYMENT_JWKS_URI: {value: http://identity-service:8080/.well-known/jwks.json}
+      PAYMENT_ORDER_BASE_URL: {value: http://order-service:8080/}
+  loyalty:
+    runtime: java
+    healthBase: /actuator/health
+    live: liveness
+    ready: readiness
+    env:
+      LOYALTY_DB_URL: {secret: LOYALTY_DB_URL}
+      LOYALTY_DB_USERNAME: {value: loyalty_app}
+      LOYALTY_DB_PASSWORD: {secret: LOYALTY_DB_PASSWORD}
+      LOYALTY_JWKS_URI: {value: http://identity-service:8080/.well-known/jwks.json}
+  promotion:
+    runtime: node
+    healthBase: /health
+    live: live
+    ready: ready
+    env:
+      SERVICE_NAME: {value: promotion}
+      PROMOTION_DB_URL: {secret: PROMOTION_DB_URL}
+      PROMOTION_JWKS_URI: {value: http://identity-service:8080/.well-known/jwks.json}
+  fulfillment:
+    runtime: node
+    healthBase: /health
+    live: live
+    ready: ready
+    env:
+      SERVICE_NAME: {value: fulfillment}
+      FULFILLMENT_DB_URL: {secret: FULFILLMENT_DB_URL}
+      FULFILLMENT_JWKS_URI: {value: http://identity-service:8080/.well-known/jwks.json}
+      FULFILLMENT_ORDER_BASE_URL: {value: http://order-service:8080/}
+  notification:
+    runtime: node
+    healthBase: /health
+    live: live
+    ready: ready
+    env:
+      SERVICE_NAME: {value: notification}
+      NOTIFICATION_DB_URL: {secret: NOTIFICATION_DB_URL}
+      NOTIFICATION_JWKS_URI: {value: http://identity-service:8080/.well-known/jwks.json}
+
+relays:
+  order: {databaseUrlKey: ORDER_RELAY_DATABASE_URL}
+  payment: {databaseUrlKey: PAYMENT_RELAY_DATABASE_URL}
+  inventory: {databaseUrlKey: INVENTORY_RELAY_DATABASE_URL}
+  loyalty: {databaseUrlKey: LOYALTY_RELAY_DATABASE_URL}
+  promotion: {databaseUrlKey: PROMOTION_RELAY_DATABASE_URL}
+
+postgres: {image: postgres:17-alpine, resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 1Gi}}}
+identityRedis: {image: redis:7.4-alpine, size: 2Gi}
+gatewayRedis: {image: redis:7.4-alpine, size: 2Gi}
+rabbitmq: {image: rabbitmq:3.13-management-alpine, size: 10Gi}
+kong: {image: kong:3.9.1, replicas: 1, serviceType: ClusterIP, workerProcesses: "2"}
+ingress: {enabled: false, className: nginx, host: api.example.com, tlsSecretName: coffee-api-tls, annotations: {}}
+
+autoscaling: {enabled: false, minReplicas: 1, maxReplicas: 2, cpuUtilization: 70}
+pdb: {enabled: false, minAvailable: 1}
+networkPolicy: {enabled: true}
+

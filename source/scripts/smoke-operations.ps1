@@ -74,6 +74,9 @@ $product=Post-Json '/api/v1/catalog/products' @{sku=$sku;name='Delivery coffee';
 New-Key
 $price=Invoke-RestMethod -Method Put -Uri "$GatewayUrl/api/v1/catalog/variants/$($product.variantId)/prices" -Headers $headers -ContentType 'application/json' -Body (@{branchId=$branch;channel='DELIVERY';unitPriceVnd=25000}|ConvertTo-Json)
 New-Key
+$recipe=Invoke-RestMethod -Method Put -Uri "$GatewayUrl/api/v1/catalog/variants/$($product.variantId)/recipe" -Headers $headers -ContentType 'application/json' -Body (@{ingredients=@(@{ingredientId=$ingredient.id;quantity=20})}|ConvertTo-Json -Depth 5)
+if ($recipe.version -ne 1) { throw 'Recipe version mismatch' }
+New-Key
 $order=Post-Json '/api/v1/orders' @{branchId=$branch;channel='DELIVERY';items=@(@{variantId=$product.variantId;quantity=1})}
 if ($order.status -ne 'CONFIRMED' -or $order.paymentStatus -ne 'PENDING_CASH') { throw 'Delivery order state invalid' }
 New-Key

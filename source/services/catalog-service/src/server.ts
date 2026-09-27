@@ -19,14 +19,22 @@ type Actor = { id: string; permissions: string[]; branchScopes: string[]; global
 type Body = Record<string, unknown>;
 
 async function migrate() {
-  const sql = await readFile(fileURLToPath(new URL('../sql/V1__catalog.sql', import.meta.url)), 'utf8');
+  const migrations = [
+    [1, '../sql/V1__catalog.sql'],
+    [2, '../sql/V2__recipe.sql']
+  ] as const;
   const db = await pool.connect();
   try {
     await db.query('BEGIN');
     await db.query('SELECT pg_advisory_xact_lock(18493001)');
     await db.query('CREATE TABLE IF NOT EXISTS schema_migration (version integer PRIMARY KEY)');
-    const applied = await db.query('SELECT version FROM schema_migration WHERE version=1');
-    if (!applied.rowCount) { await db.query(sql); await db.query('INSERT INTO schema_migration(version) VALUES (1)'); }
+    for (const [version, path] of migrations) {
+      const applied = await db.query('SELECT version FROM schema_migration WHERE version=$1', [version]);
+      if (!applied.rowCount) {
+        await db.query(await readFile(fileURLToPath(new URL(path, import.meta.url)), 'utf8'));
+        await db.query('INSERT INTO schema_migration(version) VALUES ($1)', [version]);
+      }
+    }
     await db.query('COMMIT');
   } catch (error) { await db.query('ROLLBACK'); throw error; }
   finally { db.release(); }
@@ -130,6 +138,42 @@ app.put('/api/v1/catalog/variants/:variantId/prices', async (request) => {
   });
 });
 
+app.put('/api/v1/catalog/variants/:variantId/recipe', async request => {
+  const who = await actor(request.headers.authorization);
+  const variantId = uuid((request.params as Body).variantId), body = request.body as Body;
+  requireAction(who, 'catalog:manage_product');
+  if (!Array.isArray(body.ingredients) || body.ingredients.length === 0) throw http(400, 'INVALID_RECIPE');
+  const ingredients = body.ingredients.map(value => {
+    if (typeof value !== 'object' || value === null) throw http(400, 'INVALID_RECIPE');
+    const item = value as Body, ingredientId = uuid(item.ingredientId);
+    if (typeof item.quantity !== 'number' || !Number.isSafeInteger(item.quantity) || item.quantity <= 0)
+      throw http(400, 'INVALID_RECIPE_QUANTITY');
+    return { ingredientId, quantity: item.quantity };
+  });
+  if (new Set(ingredients.map(item => item.ingredientId)).size !== ingredients.length)
+    throw http(400, 'DUPLICATE_RECIPE_INGREDIENT');
+  const idem = key(request.headers['idempotency-key']), hash = fingerprint({ variantId, ingredients }, who);
+  return transaction(async db => {
+    await db.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['recipe:' + variantId]);
+    const prior = await db.query('SELECT request_hash,result_id FROM command_result WHERE idempotency_key=$1', [idem]);
+    if (prior.rowCount) {
+      if (prior.rows[0].request_hash !== hash) throw http(409, 'IDEMPOTENCY_CONFLICT');
+      return { variantId, version: Number((await db.query('SELECT COALESCE(MAX(version),0) version FROM variant_recipe WHERE variant_id=$1', [variantId])).rows[0].version) };
+    }
+    if (!(await db.query("SELECT 1 FROM variant WHERE id=$1 AND status='ACTIVE'", [variantId])).rowCount)
+      throw http(404, 'VARIANT_NOT_FOUND');
+    const version = Number((await db.query('SELECT COALESCE(MAX(version),0)+1 next FROM variant_recipe WHERE variant_id=$1', [variantId])).rows[0].next);
+    await db.query('UPDATE variant_recipe SET active=false WHERE variant_id=$1 AND active', [variantId]);
+    for (const ingredient of ingredients)
+      await db.query('INSERT INTO variant_recipe(variant_id,ingredient_id,quantity,version,actor_id) VALUES($1,$2,$3,$4,$5)',
+        [variantId, ingredient.ingredientId, ingredient.quantity, version, who.id]);
+    await db.query('INSERT INTO command_result(idempotency_key,request_hash,result_id) VALUES($1,$2,$3)', [idem, hash, variantId]);
+    await db.query("INSERT INTO outbox_event(id,aggregate_id,event_type,payload) VALUES($1,$2,'RecipePublished.v1',$3)",
+      [randomUUID(), variantId, { variantId, version, ingredients }]);
+    return { variantId, version };
+  });
+});
+
 app.get('/api/v1/catalog/variants/:variantId/sellable', async request => {
   const who = await actor(request.headers.authorization);
   const variantId = uuid((request.params as Body).variantId), query = request.query as Body;
@@ -138,7 +182,13 @@ app.get('/api/v1/catalog/variants/:variantId/sellable', async request => {
   const result = await pool.query("SELECT p.unit_price_vnd,p.version FROM price p JOIN variant v ON v.id=p.variant_id JOIN product pr ON pr.id=v.product_id WHERE p.variant_id=$1 AND p.branch_id=$2 AND p.channel=$3 AND p.active AND v.status='ACTIVE' AND pr.status='ACTIVE'",
     [variantId, branchId, query.channel]);
   if (!result.rowCount) throw http(404, 'ITEM_NOT_SELLABLE');
-  return { variantId, branchId, channel: query.channel, unitPriceVnd: Number(result.rows[0].unit_price_vnd), priceVersion: Number(result.rows[0].version), sellable: true };
+  const recipe = await pool.query('SELECT ingredient_id,quantity,version FROM variant_recipe WHERE variant_id=$1 AND active ORDER BY ingredient_id', [variantId]);
+  return {
+    variantId, branchId, channel: query.channel,
+    unitPriceVnd: Number(result.rows[0].unit_price_vnd), priceVersion: Number(result.rows[0].version), sellable: true,
+    recipeVersion: recipe.rowCount ? Number(recipe.rows[0].version) : 0,
+    recipe: recipe.rows.map(row => ({ ingredientId: row.ingredient_id as string, quantity: Number(row.quantity) }))
+  };
 });
 
 async function main() {

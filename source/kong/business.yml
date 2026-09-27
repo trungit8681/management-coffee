@@ -1,84 +1,108 @@
 _format_version: "3.0"
 _transform: true
+
 plugins:
+  - name: correlation-id
+    config:
+      header_name: X-Correlation-ID
+      generator: uuid
+      echo_downstream: true
+  - name: cors
+    config:
+      origins: ["http://localhost:3000", "http://localhost:5173"]
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+      headers: ["Authorization", "Content-Type", "Idempotency-Key", "If-Match", "X-Correlation-ID"]
+      exposed_headers: ["X-Correlation-ID", "RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset"]
+      credentials: true
+      max_age: 3600
   - name: request-size-limiting
     config: {allowed_payload_size: 1}
+
 services:
   - name: catalog
     url: http://catalog-service:8080
     retries: 0
     connect_timeout: 3000
     read_timeout: 10000
+    write_timeout: 10000
     routes:
       - name: catalog-api
         paths: ["/api/v1/catalog"]
         strip_path: false
     plugins:
       - name: rate-limiting
-        config: {minute: 120, policy: local}
+        config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}
   - name: orders
     url: http://order-service:8080
     retries: 0
     connect_timeout: 3000
     read_timeout: 10000
+    write_timeout: 10000
     routes:
       - name: order-api
         paths: ["/api/v1/orders"]
         strip_path: false
     plugins:
       - name: rate-limiting
-        config: {minute: 120, policy: local}
+        config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}
   - name: payments
     url: http://payment-service:8080
     retries: 0
     connect_timeout: 3000
     read_timeout: 10000
+    write_timeout: 10000
     routes:
       - name: payment-api
         paths: ["/api/v1/payments"]
         strip_path: false
     plugins:
       - name: rate-limiting
-        config: {minute: 60, policy: local}
+        config: {minute: 60, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}
   - name: inventory
     url: http://inventory-service:8080
     retries: 0
     connect_timeout: 3000
     read_timeout: 10000
+    write_timeout: 10000
     routes: [{name: inventory-api, paths: ["/api/v1/inventory"], strip_path: false}]
-    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]
   - name: procurement
     url: http://procurement-service:8080
     retries: 0
     connect_timeout: 3000
     read_timeout: 10000
+    write_timeout: 10000
     routes: [{name: procurement-api, paths: ["/api/v1/procurement"], strip_path: false}]
-    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]
   - name: loyalty
     url: http://loyalty-service:8080
     retries: 0
     connect_timeout: 3000
     read_timeout: 10000
+    write_timeout: 10000
     routes: [{name: loyalty-api, paths: ["/api/v1/loyalty"], strip_path: false}]
-    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]
   - name: promotion
     url: http://promotion-service:8080
     retries: 0
     connect_timeout: 3000
     read_timeout: 10000
+    write_timeout: 10000
     routes: [{name: promotion-api, paths: ["/api/v1/promotions"], strip_path: false}]
-    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]
   - name: fulfillment
     url: http://fulfillment-service:8080
     retries: 0
     connect_timeout: 3000
     read_timeout: 10000
+    write_timeout: 10000
     routes: [{name: fulfillment-api, paths: ["/api/v1/fulfillment"], strip_path: false}]
-    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]
   - name: notification
     url: http://notification-service:8080
     retries: 0
     connect_timeout: 3000
     read_timeout: 10000
+    write_timeout: 10000
     routes: [{name: notification-api, paths: ["/api/v1/notifications"], strip_path: false}]
-    plugins: [{name: rate-limiting, config: {minute: 120, policy: local}}]
+    plugins: [{name: rate-limiting, config: {minute: 120, policy: redis, redis_host: gateway-redis, redis_port: 6379, redis_database: 1}}]

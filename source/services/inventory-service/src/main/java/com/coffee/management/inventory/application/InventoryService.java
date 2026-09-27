@@ -37,14 +37,14 @@ public class InventoryService {
     }
 
     public UUID move(StockMovement movement, String key, Actor actor) {
-        actor.require("IN".equals(movement.kind()) ? "inventory:receive" : "inventory:deduct", movement.branchId());
+        actor.require("OUT".equals(movement.kind()) ? "inventory:deduct" : "inventory:receive", movement.branchId());
         String hash = hash(actor.userId() + ":" + movement);
         return transactions.execute(tx -> {
             UUID prior = claim(key, hash);
             if (prior != null)
                 return prior;
             int updated;
-            if ("IN".equals(movement.kind())) {
+            if (!"OUT".equals(movement.kind())) {
                 updated = db.update(
                         "INSERT INTO stock_balance(branch_id,ingredient_id,quantity) VALUES (?,?,?) ON CONFLICT(branch_id,ingredient_id) DO UPDATE SET quantity=stock_balance.quantity+EXCLUDED.quantity,version=stock_balance.version+1",
                         movement.branchId(), movement.ingredientId(), movement.quantity());
@@ -61,7 +61,7 @@ public class InventoryService {
                     id, movement.branchId(), movement.ingredientId(), movement.signedQuantity(), movement.kind(),
                     movement.referenceId(), actor.userId());
             db.update("UPDATE command_result SET result_id=? WHERE idempotency_key=?", id, key);
-            outbox(id, "StockMoved.v1", "movementId", id);
+            outbox(id, "REVERSAL".equals(movement.kind()) ? "StockDeductionReversed.v1" : "StockMoved.v1", "movementId", id);
             return id;
         });
     }

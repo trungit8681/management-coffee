@@ -34,5 +34,14 @@ services:
       retries: 10
       start_period: 30s
     restart: unless-stopped
+  payment-outbox-relay:
+    build: {context: ../../infrastructure/outbox-relay}
+    environment:
+      DATABASE_URL: "postgresql://payment_app:${PAYMENT_DB_PASSWORD:-admin1234}@payment-db:5432/payment"
+      RABBITMQ_URL: "amqp://${RABBITMQ_USER:-coffee_app}:${RABBITMQ_PASSWORD:-coffee_dev_password}@host.docker.internal:${RABBITMQ_PORT:-5672}"
+      EVENT_SOURCE: payment-service
+    depends_on:
+      payment-db: {condition: service_healthy}
+    restart: unless-stopped
 volumes:
   payment_db_data: {name: coffee_payment_standalone_db_data}

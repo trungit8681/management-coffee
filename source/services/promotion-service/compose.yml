@@ -32,5 +32,14 @@ services:
       retries: 10
       start_period: 30s
     restart: unless-stopped
+  promotion-outbox-relay:
+    build: {context: ../../infrastructure/outbox-relay}
+    environment:
+      DATABASE_URL: "postgresql://promotion_app:${PROMOTION_DB_PASSWORD:?Set PROMOTION_DB_PASSWORD in .env}@promotion-db:5432/promotion"
+      RABBITMQ_URL: "amqp://${RABBITMQ_USER:-coffee_app}:${RABBITMQ_PASSWORD:-coffee_dev_password}@host.docker.internal:${RABBITMQ_PORT:-5672}"
+      EVENT_SOURCE: promotion-service
+    depends_on:
+      promotion-db: {condition: service_healthy}
+    restart: unless-stopped
 volumes:
   promotion_db_data: {name: coffee_promotion_standalone_db_data}

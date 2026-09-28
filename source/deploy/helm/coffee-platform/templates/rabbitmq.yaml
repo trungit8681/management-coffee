@@ -21,7 +21,13 @@ spec:
       initContainers:
         - name: initialize-data-permissions
           image: {{ .Values.rabbitmq.image }}
-          command: [sh, -c, "chown -R 100:101 /var/lib/rabbitmq"]
+          command:
+            - sh
+            - -c
+            - >-
+              if [ -z "$(ls -A /var/lib/rabbitmq 2>/dev/null)" ]; then
+                chown 100:101 /var/lib/rabbitmq;
+              fi
           securityContext: {runAsUser: 0, allowPrivilegeEscalation: false, capabilities: {drop: [ALL], add: [CHOWN]}}
           volumeMounts: [{name: data, mountPath: /var/lib/rabbitmq}]
       containers:

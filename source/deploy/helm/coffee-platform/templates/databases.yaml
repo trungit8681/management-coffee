@@ -29,7 +29,13 @@ spec:
       initContainers:
         - name: initialize-data-permissions
           image: {{ $.Values.postgres.image }}
-          command: [sh, -c, "chown -R 70:70 /var/lib/postgresql/data && chmod 700 /var/lib/postgresql/data"]
+          command:
+            - sh
+            - -c
+            - >-
+              if [ ! -f /var/lib/postgresql/data/PG_VERSION ]; then
+                chown 70:70 /var/lib/postgresql/data && chmod 700 /var/lib/postgresql/data;
+              fi
           securityContext: {runAsUser: 0, allowPrivilegeEscalation: false, capabilities: {drop: [ALL], add: [CHOWN, FOWNER]}}
           volumeMounts: [{name: data, mountPath: /var/lib/postgresql/data}]
       containers:

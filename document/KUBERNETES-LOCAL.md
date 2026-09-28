@@ -240,6 +240,7 @@ Các lỗi đã biết:
 - `pods.metrics.k8s.io not found`: `autoscaling.enabled` vẫn đang là `true` hoặc HPA cũ chưa được dọn.
 - `image has non-numeric user`: chart/image cũ chưa có numeric UID/GID; dùng chart hiện tại.
 - PostgreSQL báo `could not change permissions`: chart cũ chưa có init container chuẩn bị ownership PVC; dùng chart hiện tại.
+- Sau khi dừng container thủ công, init container báo `chown ... Permission denied`: chart cũ chạy lại `chown -R` trên PVC đã có dữ liệu. Chart hiện tại chỉ gán ownership khi volume chưa khởi tạo. Không quản lý pod Kubernetes bằng nút Stop container của Docker Desktop; dùng `kubectl` hoặc Helm.
 - Identity báo password dưới 12 ký tự: sửa đúng file Secret, apply lại và xác nhận độ dài trước khi restart.
 - Rollout báo `old replicas are pending termination`: thường pod mới chưa Ready; xem log pod mới thay vì xóa pod cũ ngay.
 - Kong bị `OOMKilled` hoặc startup probe timeout: xác nhận `kong.workerProcesses: "2"` trong values local.
